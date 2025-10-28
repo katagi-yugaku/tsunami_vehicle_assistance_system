@@ -330,7 +330,7 @@ if __name__ == "__main__":
                                                     shelter_list=shelter_list
                                                     )
     traci.start(
-                [sumoBinary, "-c", "/Users/kashiisamutakeshi/vehicle-assistant-system/sumo/its102/map_one/data/one_shelter_one_departure.sumocfg", "--tripinfo-output", "tripinfo.xml"], 
+                [sumoBinary, "-c", "its102/map_one/data/one_shelter_one_departure.sumocfg", "--tripinfo-output", "tripinfo.xml"], 
                 traceFile="traci_log.txt", 
                 traceGetters=False
                 )
@@ -340,8 +340,8 @@ if __name__ == "__main__":
     # 車両の開始エッジと終了エッジの組み合わせを辞書にする
     vehicle_end_list_by_start_edge_dict:dict = utilities.get_vehicle_end_list_by_start_edge_dict(vehicle_start_edges=vehicle_start_edges, vehicle_end_edges=vehicle_end_edges)
     # 全経路で総当たりをし、通行可能経路を取得しておく。
-    connected_edges_list:list = utilities.import_connected_edges_from_json(file_path="/Users/kashiisamutakeshi/vehicle-assistant-system/sumo/its102/map_one/data/all_edgeIDs.json")
-    nearest_end_edgeID_by_start_edgeID_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path="/Users/kashiisamutakeshi/vehicle-assistant-system/sumo/its102/map_one/data/start_end_edgeIDs.json")
+    connected_edges_list:list = utilities.import_connected_edges_from_json(file_path="its102/map_one/data/all_edgeIDs.json")
+    nearest_end_edgeID_by_start_edgeID_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path="its102/map_one/data/start_end_edgeIDs.json")
     # 初期の車両を生成する
     print(f"shelterIDは: {edgeID_by_shelterID}, それぞれの選択確率は: {tmp_prob_list}")
     for vehicle_start_edgeID, end_edgeIDs in nearest_end_edgeID_by_start_edgeID_dict.items():
