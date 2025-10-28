@@ -25,7 +25,6 @@ import traci  # noqa: E402
 # Third-party libraries
 # =========================
 import matplotlib.pyplot as plt
-from icecream import ic
 import numpy as np
 from numpy import double
 
