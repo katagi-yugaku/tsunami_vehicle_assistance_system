@@ -23,7 +23,6 @@ import traci  # noqa: E402
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import double
-from icecream import ic
 
 # =========================
 # Local / intra-package
