@@ -111,11 +111,6 @@ def control_vehicles(majority_bias_score: float):
         if current_edgeID == "E17":
             vehInfo_by_current_vehID.set_arrival_flag(True)
             vehInfo_by_current_vehID.set_decline_edge_arrival_flag(True)
-        # if current_vehID == "init_ShelterA_1_12":
-        #     ic(traci.vehicle.getLeader(current_vehID))
-        # 避難地のあるレーンに到達すると加速
-        # if vehInfo_by_current_vehID.get_arrival_flag():
-        #     traci.vehicle.setSpeed(current_vehID, 5.0)
         # 津波接近情報を取得後に、ピックアップ行動を取らないものとする
         if vehInfo_by_current_vehID.has_tsunami_precursor_info() and  vehInfo_by_current_vehID.get_edgeID_connect_target_shelter() == "E9":
             # 左折してしまっていたら、車両を生成させる
@@ -154,8 +149,6 @@ def control_vehicles(majority_bias_score: float):
                                                         edgeID_near_shelter=vehInfo_by_current_vehID.get_edgeID_connect_target_shelter(),
                                                         custome_edge_list=custome_edge_list
                                                         )
-            if current_vehID == "init_ShelterA_1_12:":
-                ic(traci.vehicle.getLeader(current_vehID))
             if traci.vehicle.getLeader(current_vehID) is None or traci.vehicle.getLeader(current_vehID)[1] > 50:
                 traci.vehicle.setColor(current_vehID, (50, 25, 255))
                 traci.vehicle.setSpeed(current_vehID, 9.0)
@@ -403,8 +396,3 @@ if __name__ == "__main__":
         print("OK all vehs arrived ")
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
-    
-    # ic(np.mean(elapsed_time_list))
-    # test_agent: Agent = agent_list[76]
-    # ic(test_agent.get_vehID())
-    # utilities.plot_dot(test_agent)
