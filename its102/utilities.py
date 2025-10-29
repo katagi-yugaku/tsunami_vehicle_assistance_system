@@ -1461,6 +1461,6 @@ def two_stage_sigmoid(value: float):
     s1 = 1 / (1 + np.exp(-k1 * (value - x01)))
     s2 = 1 / (1 + np.exp(-k2 * (value - x02)))
     
-    y_norm = 0.4 * s1 + 0.6 * s2  # 緩やか + 急上昇を合成
+    y_norm = 0.5 * (s1 +  s2)  # 緩やか + 急上昇を合成
     return ymin + (ymax - ymin) * y_norm
 
