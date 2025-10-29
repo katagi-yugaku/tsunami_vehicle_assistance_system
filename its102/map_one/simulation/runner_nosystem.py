@@ -37,9 +37,10 @@ from ...agents.VehicleInfo import VehicleInfo
 # Runtime config / seeds
 # =========================
 random.seed(318)  # 乱数シードを固定（再現性）
+# random.seed()
 
 COMMUNICATION_RANGE = 100
-END_SIMULATION_TIME = 2000
+END_SIMULATION_TIME = 1500
 VEHICLE_NUM = 0
 DEPART_TIME: double = 0.0
 ROUTE_NUM = 0
@@ -52,12 +53,17 @@ STOPPING_TIME_IN_SHELTER = 15
 EARLY_AGENT_THRESHOLD_LIST = [60, 90, 100, 130] # 早期決断者の閾値
 LATE_AGENT_THRESHOLD_LIST = [180, 220, 300, 350] # 遅延決断者の閾値
 VEH_START_TIME_BY_SHELTERID = {"ShelterA_1": 0, "ShelterA_2": 0} # 避難所ごとの車両の開始時間
-TOTAL_VEHNUM = 200
+TOTAL_VEHNUM = 150
 NEW_VEHICLE_COUNT = 0
 LANE_CHANGED_VEHICLE_COUNT = 0
+NORMALCY_BIAS_COUNT = 0
 POSITIVE_MAJORITY_BIAS_COUNT = 0
 NEGATIVE_MAJORITY_BIAS_COUNT = 0
 TSUNAMI_PRECURSOR_INFO_OBTAIN_TIME = 0
+DECISION_EVALUATION_INTERVAL_FOR_INITIAL = 20.0
+DECISION_EVALUATION_INTERVAL = 20.0
+MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS = 100.0
+MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 150.0
 
 # リストの初期化
 custome_edge_list: list = []
@@ -89,6 +95,7 @@ def control_vehicles(majority_bias_score: float):
     global LANE_CHANGED_VEHICLE_COUNT
     global POSITIVE_MAJORITY_BIAS_COUNT
     global NEGATIVE_MAJORITY_BIAS_COUNT
+    global NORMALCY_BIAS_COUNT
     # 現在の存在するrouteを確認する
     for routeID in traci.route.getIDList():
         # 現在のrouteを取得
@@ -110,7 +117,6 @@ def control_vehicles(majority_bias_score: float):
         if current_edgeID == "E17":
             vehInfo_by_current_vehID.set_arrival_flag(True)
             vehInfo_by_current_vehID.set_decline_edge_arrival_flag(True)
-
         # 津波接近情報を取得後に、ピックアップ行動を取らないものとする
         if vehInfo_by_current_vehID.has_tsunami_precursor_info() and  vehInfo_by_current_vehID.get_edgeID_connect_target_shelter() == "E9":
             # 左折してしまっていたら、車両を生成させる
@@ -141,77 +147,256 @@ def control_vehicles(majority_bias_score: float):
                             arrival_time_by_vehID_dict=arrival_time_by_vehID_dict
                             )
         
-        if not vehInfo_by_current_vehID.get_decline_edge_arrival_flag() and not agent_by_current_vehID.get_evacuation_route_changed_flg(): # 減速処理を行うx
-            # 避難地に接続する(直前の)道路にいる場合、減速する
+        if not vehInfo_by_current_vehID.get_decline_edge_arrival_flag():  # 減速処理を行う
+            #避難地に接続する(直前の)道路にいる場合、減速する
             pre_edgeID_near_shelter_flag = \
-                utilities.is_pre_edgeID_near_shelter(
-                                                        current_edgeID=current_edgeID, 
-                                                        edgeID_near_shelter=vehInfo_by_current_vehID.get_edgeID_connect_target_shelter(),
-                                                        custome_edge_list=custome_edge_list
-                                                        )
-            if traci.vehicle.getLeader(current_vehID) is None or traci.vehicle.getLeader(current_vehID)[1] > 50:
-                traci.vehicle.setColor(current_vehID, (50, 25, 255))
-                traci.vehicle.setSpeed(current_vehID, 9.0)
-                # or traci.vehicle.getLeader(current_vehID)[1] > 100
-            else:
-                if pre_edgeID_near_shelter_flag and not vehInfo_by_current_vehID.get_decline_edge_arrival_flag():
-                    traci.vehicle.setColor(current_vehID, (0, 255, 0)) # 減速対象の車両を緑色に変更
-                    # traci.vehicle.setSpeed(current_vehID, 3.0)
-                    local_density = utilities.get_local_density(
-                                                                vehID=current_vehID, 
-                                                                radius=50
-                                                                )
-                    utilities.set_speed_by_local_density(
-                                                            vehID=current_vehID,
-                                                            local_density=local_density
+                    utilities.is_pre_edgeID_near_shelter(
+                                                            current_edgeID=current_edgeID, 
+                                                            edgeID_near_shelter=vehInfo_by_current_vehID.get_edgeID_connect_target_shelter(),
+                                                            custome_edge_list=custome_edge_list
                                                             )
+            if pre_edgeID_near_shelter_flag and not vehInfo_by_current_vehID.get_decline_edge_arrival_flag():
+                # 避難地直前のエッジに入った車両だけ減速制御
+                local_density = utilities.get_local_density(vehID=current_vehID, radius=50.0)
+                utilities.apply_gap_density_speed_control(
+                                                            vehID=current_vehID,
+                                                            local_density=local_density,
+                                                            v_free=6.0,     # 自由流速度
+                                                            v_min=2.0,      # 最低速度
+                                                            gap_min=7.0,    # 強い減速を始めるギャップ
+                                                            tau=1.8,        # ギャップ→速度変換の傾き
+                                                            alpha=0.5,      # 平滑化
+                                                            slow_time=1.0   # 速度変更時間
+                                                            )
+            else:
+                # それ以外は自由流走行
+                traci.vehicle.slowDown(current_vehID, 7.0, 1.0)
 
         if not vehInfo_by_current_vehID.get_arrival_flag(): # 未到着の車両に対して処理を実行
+            # # 通信可能範囲内にいる車両と通信を行う　通信可能範囲は100m設定になる
+            # if traci.simulation.getTime() % 10 == 0:
+            #     around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
+            #     utilities.v2v_communication(
+            #                                 target_vehID=current_vehID, 
+            #                                 target_vehInfo=vehInfo_by_current_vehID, 
+            #                                 around_vehIDs=around_vehIDs,
+            #                                 agent_list=agent_list,
+            #                                 vehInfo_list=vehInfo_list,
+            #                                 COMMUNICATION_RANGE=COMMUNICATION_RANGE
+            #                                 )
+
+            #     utilities.v2shelter_communication(
+            #                                         target_vehID=current_vehID, 
+            #                                         shelterID=vehInfo_by_current_vehID.get_target_shelter(),
+            #                                         vehInfo_list=vehInfo_list,
+            #                                         shelter_list=shelter_list,
+            #                                         COMMUNICATION_RANGE=COMMUNICATION_RANGE
+            #                                         )
+                
+            #     utilities.v2v_communication_about_tsunami_info(
+            #                                                     target_vehID=current_vehID, 
+            #                                                     target_vehInfo=vehInfo_by_current_vehID, 
+            #                                                     around_vehIDs=around_vehIDs, 
+            #                                                     vehInfo_list=vehInfo_list, 
+            #                                                     COMMUNICATION_RANGE=COMMUNICATION_RANGE
+            #                                                     )
+
             # 心理モデルの実装
-            if current_edgeID in ["E2", "E3", "E4", "E5", "E6", "E7"] and current_edgeID != 'E17':
-                if not agent_by_current_vehID.get_evacuation_route_changed_flg(): #TODO 渋滞の実装入れるか悩むねー
-                    # レーン変更の意思決定箇所
-                    if traci.simulation.getTime() % 4 == 0 and not agent_by_current_vehID.get_evacuation_route_changed_flg():
-                        try:
-                            newest_time = agent_by_current_vehID.get_time_lane_change_list()[-1]
-                            agent_stress_value = agent_by_current_vehID.get_lane_change_xy_dict()[int(newest_time)]
-                            if agent_by_current_vehID.get_lane_change_threshold_list()[-1] < agent_stress_value:
-                                try:
-                                    traci.vehicle.changeLane(vehID=current_vehID, laneIndex=1, duration=1000)
-                                except Exception as e:
-                                    print(f"Error changing lane for vehicle {current_vehID}: {e}")
-                                utilities.init_driver_behavior(vehIDs = [current_vehID], lane_change_mode=512)
-                                traci.vehicle.setParkingAreaStop(vehID=current_vehID, stopID="ShelterA_2", duration=100000)
-                                traci.vehicle.setSpeed(current_vehID, 9.0)
-                                vehInfo_by_current_vehID.set_target_shelter("ShelterA_2")
+            if current_edgeID in ["E2", "E3", "E4", "E5", "E6", "E7"] and not agent_by_current_vehID.get_evacuation_route_changed_flg():
+                # 浮動小数対策（必要ならepsを使う or ステップ数で判定）
+                if traci.simulation.getTime() % DECISION_EVALUATION_INTERVAL == 0:
+                    elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time()
+                    agent_by_current_vehID.update_calculated_motivation_value(current_time=elapsed_time)
+                    # ★ この2つだけを以後ずっと使う（getterを再呼び出ししない）
+                    mot = agent_by_current_vehID.get_calculated_motivation_value()
+                    thr = agent_by_current_vehID.get_lane_change_decision_threshold()
+                    # ★ Noneなら即スキップ。フラグは立てない（以後も再評価できるように）
+                    if mot is None or thr is None:
+                        continue
+                    
+                    # ★ 以降で getter を呼ばず、ローカル mot/thr を使う
+                    if utilities.is_vehID_in_congested_edge(vehID=current_vehID, THRESHOLD_SPEED=THRESHOLD_SPEED):
+                        if mot >= thr:
+                            success_lane_change = utilities.lane_change_by_vehID(
+                                                                                    vehID=current_vehID,
+                                                                                    agent=agent_by_current_vehID,
+                                                                                    vehInfo=vehInfo_by_current_vehID
+                                                                                )
+                            if success_lane_change:
+                                # print("変更1！！！！")
                                 LANE_CHANGED_VEHICLE_COUNT += 1
                                 agent_by_current_vehID.set_evacuation_route_changed_flg(True)
-                                traci.vehicle.setColor(current_vehID, (255, 0, 0)) # レーン変更した車両を赤色に変更
-                        except IndexError:
-                            pass
-
-                    # 正常性バイアスの実装箇所情報を受け取ると閾値が急激に減少　レーンが変更しやすくなる
-                    if vehInfo_by_current_vehID.has_tsunami_precursor_info() and not agent_by_current_vehID.get_normalcy_lane_change_motivation_flg():
-                        current_lane_change_motivation = agent_by_current_vehID.get_lane_change_threshold_list()[-1]
-                        agent_by_current_vehID.append_lane_change_threshold_list(current_lane_change_motivation-agent_by_current_vehID.get_normalcy_lane_change_motivation()) # TODO 仮置き
-                        agent_by_current_vehID.append_time_lane_change_list(traci.simulation.getTime()-agent_by_current_vehID.get_created_time())
-                        agent_by_current_vehID.set_normalcy_lane_change_motivation_flg(True)
+                
+                # 津波接近情報を取得した場合、避難行動を取るため、閾値を更新 閾値を超えるとレーンチェンジを実行
+                if vehInfo_by_current_vehID.has_tsunami_precursor_info() and not agent_by_current_vehID.get_normalcy_lane_change_motivation_flg():
+                    elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time()
+                    # 現在値を更新してから、情報受領分を上乗せ
+                    agent_by_current_vehID.update_calculated_motivation_value(current_time=elapsed_time)
+                    current_motivation = agent_by_current_vehID.get_calculated_motivation_value()
+                    inc = float(agent_by_current_vehID.get_motivation_increase_from_info_receive())
+                    agent_by_current_vehID.set_calculated_motivation_value(current_motivation + inc)
+                    agent_by_current_vehID.set_normalcy_lane_change_motivation_flg(True)
+                    # ここからが修正ポイント：履歴の「該当 index 以降」に一括加算する
+                    x_list = list(agent_by_current_vehID.get_x_elapsed_time_for_lane_change_list())
+                    y_list = list(agent_by_current_vehID.get_y_motivation_value_for_lane_change_list())
+                    # 先に index を決める（elapsed_time より後の先頭インデックス）
+                    tail_start_idx = None
+                    for idx, t in enumerate(x_list):
+                        if elapsed_time < t:
+                            tail_start_idx = idx
+                            break
+                        
+                    if tail_start_idx is not None:
+                        # 尾部に一括で加算（in-place）
+                        for j in range(tail_start_idx, len(y_list)):
+                            y_list[j] = float(y_list[j]) + inc
+                        # setter には「リスト全体」を渡す（スカラー禁止）
+                        agent_by_current_vehID.set_y_motivation_value_for_lane_change_list(y_list)
+                        # XY 対応表も再構築
+                        agent_by_current_vehID.set_lane_change_xy_dict(dict(zip(x_list, y_list)))
+                    NORMALCY_BIAS_COUNT += 1
+                    # 閾値判定（※仕様に合わせて < / >= を選択）
+                    if agent_by_current_vehID.get_calculated_motivation_value() >= agent_by_current_vehID.get_lane_change_decision_threshold():
+                        success_lane_change = utilities.lane_change_by_vehID(
+                                                                                vehID=current_vehID,
+                                                                                agent=agent_by_current_vehID,
+                                                                                vehInfo=vehInfo_by_current_vehID
+                                                                            )
+                        if success_lane_change:
+                            LANE_CHANGED_VEHICLE_COUNT += 1
+                            # print("変更2！！！！")
+                            agent_by_current_vehID.set_evacuation_route_changed_flg(True)
+                    continue
+                
+                # 周囲の行動に同調する場合の処理
+                if (int(traci.simulation.getTime()) % int(DECISION_EVALUATION_INTERVAL) == 0 
+                        and not vehInfo_by_current_vehID.get_arrival_flag() 
+                        and not agent_by_current_vehID.get_evacuation_route_changed_flg() 
+                        and agent_by_current_vehID.get_normalcy_lane_change_motivation_flg()):
                     
-                    # 同調整バイアスの実装箇所 ここを2で割るとTrueにならない
-                    if traci.simulation.getTime() % 5 == 0 and not vehInfo_by_current_vehID.get_arrival_flag() and not agent_by_current_vehID.get_evacuation_route_changed_flg():
-                        # 周囲が避難行動を取る場合、自身も避難行動を取ろうとするため、閾値が減少
-                        if utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list):
-                            current_lane_change_motivation = agent_by_current_vehID.get_lane_change_threshold_list()[-1]
-                            agent_by_current_vehID.append_lane_change_threshold_list(current_lane_change_motivation-majority_bias_score)
-                            agent_by_current_vehID.append_time_lane_change_list(traci.simulation.getTime()-agent_by_current_vehID.get_created_time())
-                            POSITIVE_MAJORITY_BIAS_COUNT += 1 
+                    # 周囲が避難行動を取らない場合、自身も合わせようとするため、閾値が減少
+                    if not utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list) and not agent_by_current_vehID.get_lane_minimum_motivation_value_flg():
+                        elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time()
+                        # 現在値を更新してから、情報受領分を上乗せ
+                        agent_by_current_vehID.update_calculated_motivation_value(current_time=elapsed_time)
+                        current_motivation = agent_by_current_vehID.get_calculated_motivation_value()
+                        inc = float(agent_by_current_vehID.get_motivation_decrease_due_to_inactive_neighbors())
+                        new_motivation = current_motivation - inc
+                        # print(f"vehID:{current_vehID}, 経過時間: {elapsed_time} 現在値: {current_motivation}, 減少量: {inc}, 新値: {new_motivation} 閾値: {agent_by_current_vehID.get_lane_change_decision_threshold()}")
+                        if new_motivation < agent_by_current_vehID.get_minimum_motivation_value():
+                            agent_by_current_vehID.set_lane_minimum_motivation_value_flg(True)
+                            agent_by_current_vehID.set_reach_lane_minimum_motivation_time(elapsed_time)
 
-                        # 周囲が避難行動を取らない場合、周囲の行動に同調するため、自身の閾値を上昇させる
-                        else:
-                            current_lane_change_motivation = agent_by_current_vehID.get_lane_change_threshold_list()[-1]
-                            agent_by_current_vehID.append_lane_change_threshold_list(current_lane_change_motivation+majority_bias_score)
-                            agent_by_current_vehID.append_time_lane_change_list(traci.simulation.getTime()-agent_by_current_vehID.get_created_time())
-                            NEGATIVE_MAJORITY_BIAS_COUNT += 1
+                            # --- 基底カーブ（元のシグモイド） ---
+                            base_x = np.arange(0, 450, 1, dtype=float)
+                            base_y = np.array([float(utilities.two_stage_sigmoid(x)) for x in base_x], dtype=float)
+
+                            # --- 現在の履歴 ---
+                            x_list = list(agent_by_current_vehID.get_x_elapsed_time_for_lane_change_list())
+                            y_list = list(agent_by_current_vehID.get_y_motivation_value_for_lane_change_list())
+
+                            # 下限到達時刻 t0 以降の開始 index
+                            tail_start_idx = None
+                            for idx, t in enumerate(x_list):
+                                if elapsed_time <= t:    # ← <= で“現在バケット”も含める
+                                    tail_start_idx = idx
+                                    break
+
+                            if tail_start_idx is not None:
+                                theta_min = float(agent_by_current_vehID.get_minimum_motivation_value())
+                                theta_dec = float(agent_by_current_vehID.get_lane_change_decision_threshold())
+
+                                t0 = float(elapsed_time)
+                                m0_raw = float(new_motivation)          # その時点の実値（下限より下になり得る）
+                                b0 = float(np.interp(t0, base_x, base_y))
+
+                                m0 = max(m0_raw, theta_min)             # ★ここが重要：下限でクランプ
+                                delta = m0 - b0                         # 以後はこの Δ を足す
+
+                                for j in range(tail_start_idx, len(y_list)):
+                                    xj = float(x_list[j])
+                                    bj = float(np.interp(xj, base_x, base_y))
+                                    v  = bj + delta                     # シグモイドを Δ だけ上方シフト
+                                    v  = max(theta_min, min(theta_dec, v))
+                                    # 連続性の担保：t0直後で必ず非減少
+                                    if xj >= t0:
+                                        v = max(v, m0)
+                                    y_list[j] = v
+
+                                agent_by_current_vehID.set_y_motivation_value_for_lane_change_list(y_list)
+                                agent_by_current_vehID.set_lane_change_xy_dict(dict(zip(x_list, y_list)))
+
+                            # この tick の以降処理はスキップ（任意）
+                            continue
+
+
+                        agent_by_current_vehID.set_calculated_motivation_value(new_motivation)
+                        x_list = list(agent_by_current_vehID.get_x_elapsed_time_for_lane_change_list())
+                        y_list = list(agent_by_current_vehID.get_y_motivation_value_for_lane_change_list()) 
+                        tail_start_idx = None
+                        for idx, t in enumerate(x_list):
+                            if elapsed_time < t:
+                                tail_start_idx = idx
+                                break
+                            
+                        if tail_start_idx is not None:
+                            # 尾部に一括で加算（in-place）
+                            for j in range(tail_start_idx, len(y_list)):
+                                y_list[j] = float(new_motivation)
+                            # setter には「リスト全体」を渡す（スカラー禁止）
+                            agent_by_current_vehID.set_y_motivation_value_for_lane_change_list(y_list)
+                            # XY 対応表も再構築
+                            agent_by_current_vehID.set_lane_change_xy_dict(dict(zip(x_list, y_list)))
+                        NEGATIVE_MAJORITY_BIAS_COUNT += 1 
+                        if agent_by_current_vehID.get_calculated_motivation_value() >= agent_by_current_vehID.get_lane_change_decision_threshold():
+                            success_lane_change = utilities.lane_change_by_vehID(
+                                                                                    vehID=current_vehID,
+                                                                                    agent=agent_by_current_vehID,
+                                                                                    vehInfo=vehInfo_by_current_vehID
+                                                                                )
+                            if success_lane_change:
+                                LANE_CHANGED_VEHICLE_COUNT += 1
+                                # print("変更3！！！！")
+                                agent_by_current_vehID.set_evacuation_route_changed_flg(True)
+                    # 周囲が避難行動を取る場合、周囲の行動に同調するため、自身の閾値を上昇させる
+                    else:
+                        elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time()
+                        # 現在値を更新してから、情報受領分を上乗せ
+                        agent_by_current_vehID.update_calculated_motivation_value(current_time=elapsed_time)
+                        current_motivation = agent_by_current_vehID.get_calculated_motivation_value()
+                        inc = float(agent_by_current_vehID.get_motivation_increase_due_to_following_neighbors())
+                        new_motivation = current_motivation + inc
+                        agent_by_current_vehID.set_calculated_motivation_value(new_motivation)
+                        POSITIVE_MAJORITY_BIAS_COUNT += 1 
+                        # ここからが修正ポイント：履歴の「該当 index 以降」に一括加算する
+                        x_list = list(agent_by_current_vehID.get_x_elapsed_time_for_lane_change_list())
+                        y_list = list(agent_by_current_vehID.get_y_motivation_value_for_lane_change_list()) 
+                        # 先に index を決める（elapsed_time より後の先頭インデックス）
+                        tail_start_idx = None
+                        for idx, t in enumerate(x_list):
+                            if elapsed_time < t:
+                                tail_start_idx = idx
+                                break
+                            
+                        if tail_start_idx is not None:
+                            # 尾部に一括で加算（in-place）
+                            for j in range(tail_start_idx, len(y_list)):
+                                y_list[j] = float(new_motivation)
+                            # setter には「リスト全体」を渡す（スカラー禁止）
+                            agent_by_current_vehID.set_y_motivation_value_for_lane_change_list(y_list)
+                            # XY 対応表も再構築
+                            agent_by_current_vehID.set_lane_change_xy_dict(dict(zip(x_list, y_list)))
+                        if agent_by_current_vehID.get_calculated_motivation_value() >= agent_by_current_vehID.get_lane_change_decision_threshold():
+                            success_lane_change = utilities.lane_change_by_vehID(
+                                                                                    vehID=current_vehID,
+                                                                                    agent=agent_by_current_vehID,
+                                                                                    vehInfo=vehInfo_by_current_vehID
+                                                                                )
+                            if success_lane_change:
+                                LANE_CHANGED_VEHICLE_COUNT += 1
+                                # print(f"vehID: {current_vehID} 変更4！！！！　")
+                                agent_by_current_vehID.set_evacuation_route_changed_flg(True)
+
 
             if current_edgeID == "E16":
                 if traci.simulation.getTime() > 180 and traci.simulation.getTime() < 250:
@@ -237,7 +422,7 @@ def handle_arrival(current_vehID, vehInfo_by_current_vehID:VehicleInfo, agent_by
     """
     arrival_time_list.append(traci.simulation.getTime())
     arrival_time_by_vehID_dict[f"{current_vehID}"] = traci.simulation.getTime()
-    traci.vehicle.setSpeed(current_vehID, 3.0)
+    traci.vehicle.setSpeed(current_vehID, 9.0)
     # 避難地オブジェクトに登録
     shelter_for_current_vehID.add_arrival_vehID(current_vehID)
     vehInfo_by_current_vehID.set_evac_end_time(traci.simulation.getTime())
@@ -351,7 +536,9 @@ if __name__ == "__main__":
                                                 edgeID_by_shelterID=edgeID_by_shelterID, 
                                                 EARLY_AGENT_THRESHOLD_LIST=EARLY_AGENT_THRESHOLD_LIST, 
                                                 LATE_AGENT_THRESHOLD_LIST=LATE_AGENT_THRESHOLD_LIST, 
-                                                ATTR_RATE=early_rate
+                                                ATTR_RATE=early_rate,
+                                                MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
+                                                MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS
                                                 )
 
     # ドライバーの行動の初期化
@@ -359,12 +546,20 @@ if __name__ == "__main__":
     for vehID in traci.vehicle.getIDList():
         traci.vehicle.setMaxSpeed(vehID, 9.0)
     run(majority_bias_score=majority_bias_score)
+    print("===== Simlation Result Summary =====")
     print("LANE_CHANGED_VEHICLE_NUM:", LANE_CHANGED_VEHICLE_COUNT)
     print("ROUTE_CHANGED_VEHICLE_NUM:", NEW_VEHICLE_COUNT)
-    print("POSITIVE_MAJORITY_BIAS_COUNT:", POSITIVE_MAJORITY_BIAS_COUNT)
+    print("NORMALCY_BIAS_COUNT:", NORMALCY_BIAS_COUNT)
     print("NEGATIVE_MAJORITY_BIAS_COUNT:", NEGATIVE_MAJORITY_BIAS_COUNT)
+    print("POSITIVE_MAJORITY_BIAS_COUNT:", POSITIVE_MAJORITY_BIAS_COUNT)
     print(f"arrival_time_by_vehID_dict: {arrival_time_by_vehID_dict}")
+    # print(f"elapsed_time_list: {elapsed_time_list}")
+    print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
     if len(arrival_time_list) == TOTAL_VEHNUM:
         print("OK all vehs arrived ")
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
+    
+    for agent in agent_list:
+        if agent.get_vehID() == "init_ShelterA_1_116":
+            utilities.plot_dot(agent)

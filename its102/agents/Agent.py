@@ -1,7 +1,10 @@
 from .VehicleInfo import VehicleInfo
 
 class Agent():
-    def __init__(self, vehID:str, target_shelter:str, tunning_threshold:int, route_change_threshold:float, lane_change_init_threshold:float):
+    def __init__(self, vehID:str, target_shelter:str, tunning_threshold:int, 
+                 route_change_threshold:float, lane_change_init_threshold:float, 
+                 normalcy_motivation_increase:float, motivation_decrease_due_to_inactive_neighbors:float,
+                 motivation_increase_due_to_following_neighbors:float, lane_minimum_motivation_value:float):
         self.vehID = vehID #　車両ID
         self.target_shelter = target_shelter #　車両が向かう避難所
         self.near_edgeID_by_target_shelter = "" #　車両が向かう避難所に接続するedgeID
@@ -10,22 +13,34 @@ class Agent():
         self.tunning_threshold = tunning_threshold # Agentの行動を変更するstress->tunningへの耐久時間
         self.route_change_threshold = route_change_threshold # Agentの行動を変更するtunnig->change渋滞継続時間の耐久時間
         self.route_change_threhold_list = [] #　耐久時間リスト
-        self.current_lane_change_motivation = 0 # 現在の車線変更動機付け
-        self.x_lane_change = []
-        self.y_lane_change = []
-        self.lane_change_xy_dict = {} # 車線変更xy座標辞書
-        self.lane_change_init_threshold = lane_change_init_threshold #　車線変更初期閾値
-        self.lane_change_threshold_list = [] #　車線変更閾値リスト
-        self.time_lane_change_list = [] # 車線変更時間リスト
-        self.following_threshold = 0 # 避難地を変更した運転者に追従する閾値
-        self.normalcy_lane_change_motivation = 0 # 通常時の車線変更動機付け
-        self.created_time = 0 # エージェント作成時間
-        self.arrival_time = 0 # 避難地到着時間
+        self.lane_change_decision_threshold = lane_change_init_threshold # 車線変更動機付け閾値
+        self.minimum_motivation_value = lane_minimum_motivation_value
+        self.obtain_info_time = 0.0 # 情報取得時間
+        self.motivation_increase_from_info_receive = normalcy_motivation_increase # 情報受信による動機付け増加量
+        self.motivation_decrease_due_to_inactive_neighbors = motivation_decrease_due_to_inactive_neighbors # 非活動的な近隣車両による動機付け減少量
+        self.motivation_increase_due_to_following_neighbors = motivation_increase_due_to_following_neighbors  # 追従する近隣車両による動機付け増加量
+        self.calculated_motivation_value = 0.0
+        self.x_elapsed_time_for_lane_change_list = []
+        self.y_motivation_value_for_lane_change_list = []
+        self.lane_change_xy_dict = {}
+        self.created_time = 0.0 # エージェント作成時間
+        self.arrival_time = 0.0 # 避難地到着時間
+        self.lane_change_time = 0.0 # 車線変更時間
+        self.reach_lane_minimum_motivation_time = 0.0 # 車線変更動機付けの最小値に到達した時間
         self.created_time_flg = False # エージェント作成時間設定フラグ
         self.shelter_flg = False #　駐車フラグ
         self.shelter_changed_flg = False #　避難地変更フラグ
         self.evacuation_route_changed_flg = False # 避難ルート変更フラグ
         self.normalcy_lane_change_motivation_flg = False # 通常時の車線変更動機付けフラグ
+        self.acceleration_flag = False # 加速フラグ
+        self.lane_minimum_motivation_value_flg = False # 車線変更動機付けの最小値
+
+    # ドライバーの現在の車線変更動機付け値の更新
+    def update_calculated_motivation_value(self, current_time:float):
+        # TODO ここが間違ってる
+        current_motivation_value = self.get_lane_change_xy_dict().get(current_time)
+        # print(f"current_time: {current_time}, current_motivation_value: {current_motivation_value}") 
+        self.set_calculated_motivation_value(current_motivation_value)
 
     #　渋滞継続時間の更新
     def update_congestion_duration(self):
@@ -101,92 +116,102 @@ class Agent():
         self.route_change_threshold = route_change_threshold
 
     # 現在の車線変更動機付けの取得・設定
-    def get_current_lane_change_motivation(self):
-        return self.current_lane_change_motivation
-    def set_current_lane_change_motivation(self, current_lane_change_motivation:int):
-        self.current_lane_change_motivation = current_lane_change_motivation
+    def get_lane_change_decision_threshold(self):
+        return self.lane_change_decision_threshold
+    def set_lane_change_decision_threshold(self, lane_change_decision_threshold:float):
+        self.lane_change_decision_threshold = lane_change_decision_threshold
 
-    # 車線変更初期閾値の取得・設定
-    def get_lane_change_init_threshold(self):
-        return self.lane_change_init_threshold
-    def set_lane_change_init_threshold(self, lane_change_init_threshold:int):
-        self.lane_change_init_threshold = lane_change_init_threshold
-    
-    # 車線変更閾値リストの取得・設定
-    def init_lane_change_threshold_list(self):
-        self.lane_change_threshold_list.append(self.get_lane_change_init_threshold())
-    def get_lane_change_threshold_list(self):
-        return self.lane_change_threshold_list
-    def set_lane_change_threshold_list(self, lane_change_threshold_list:list):
-        self.lane_change_threshold_list = lane_change_threshold_list
-    def append_lane_change_threshold_list(self, value:float):
-        self.lane_change_threshold_list.append(value)
-    
-    # 車線変更時間リストの取得・設定
-    def init_time_lane_change_list(self):
-        self.time_lane_change_list.append(0)
-    def get_time_lane_change_list(self):
-        return self.time_lane_change_list
-    def set_time_lane_change_list(self, time_lane_change_list:list):
-        self.time_lane_change_list = time_lane_change_list
-    def append_time_lane_change_list(self, value:int):
-        self.time_lane_change_list.append(value)
+    # 最小車線変更動機付け値の取得・設定
+    def get_minimum_motivation_value(self):
+        return self.minimum_motivation_value
+    def set_minimum_motivation_value(self, minimum_motivation_value:float):
+        self.minimum_motivation_value = minimum_motivation_value
+
+    # 情報取得時間
+    def get_obtain_info_time(self):
+        return self.obtain_info_time
+    def set_obtain_info_time(self, obtain_info_time:float):
+        self.obtain_info_time = obtain_info_time
+
+    # 情報受信による動機付け増加量の取得・設定
+    def get_motivation_increase_from_info_receive(self):
+        return self.motivation_increase_from_info_receive
+    def set_motivation_increase_from_info_receive(self, motivation_increase_from_info_receive:float):
+        self.motivation_increase_from_info_receive = motivation_increase_from_info_receive
+
+    # 非活動的な近隣車両による動機付け減少量の取得・設定
+    def get_motivation_decrease_due_to_inactive_neighbors(self):
+        return self.motivation_decrease_due_to_inactive_neighbors
+    def set_motivation_decrease_due_to_inactive_neighbors(self, motivation_decrease_due_to_inactive_neighbors:float):
+        self.motivation_decrease_due_to_inactive_neighbors = motivation_decrease_due_to_inactive_neighbors
+
+    # 追従する近隣車両による動機付け増加量の取得・設定
+    def get_motivation_increase_due_to_following_neighbors(self):
+        return self.motivation_increase_due_to_following_neighbors
+    def set_motivation_increase_due_to_following_neighbors(self, motivation_increase_due_to_following_neighbors:float):
+        self.motivation_increase_due_to_following_neighbors = motivation_increase_due_to_following_neighbors
+
+    # 現在の動機付け値の取得・設定
+    def get_calculated_motivation_value(self):
+        return self.calculated_motivation_value
+    def set_calculated_motivation_value(self, calculated_motivation_value:float):
+        self.calculated_motivation_value = calculated_motivation_value
 
     # 車線変更x座標の取得・設定
-    def get_x_lane_change(self):
-        return self.x_lane_change
-    def set_x_lane_change(self, x_lane_change:dict):
-        self.x_lane_change = x_lane_change
-    def append_x_lane_change(self, value:float):
-        self.x_lane_change.append(value)
-    def pop_x_lane_change(self):
-        return self.x_lane_change.pop()
+    def get_x_elapsed_time_for_lane_change_list(self):
+        return self.x_elapsed_time_for_lane_change_list
+    def set_x_elapsed_time_for_lane_change_list(self, x_elapsed_time_for_lane_change_list:list):
+        self.x_elapsed_time_for_lane_change_list = x_elapsed_time_for_lane_change_list
+    def append_x_elapsed_time_for_lane_change_list(self, value:float):
+        self.x_elapsed_time_for_lane_change_list.append(value)
+    def pop_x_elapsed_time_for_lane_change_list(self):
+        return self.x_elapsed_time_for_lane_change_list.pop()
 
     # 車線変更y座標の取得・設定
-    def get_y_lane_change(self):
-        return self.y_lane_change
-    def set_y_lane_change(self, y_lane_change:dict):
-        self.y_lane_change = y_lane_change
-    def append_y_lane_change(self, value:float):
-        self.y_lane_change.append(value)
-    def pop_y_lane_change(self):
-        return self.y_lane_change.pop()
-    
+    def get_y_motivation_value_for_lane_change_list(self):
+        return self.y_motivation_value_for_lane_change_list
+    def set_y_motivation_value_for_lane_change_list(self, y_motivation_value_for_lane_change_list:list):
+        self.y_motivation_value_for_lane_change_list = y_motivation_value_for_lane_change_list
+    def append_y_motivation_value_for_lane_change_list(self, value:float):
+        self.y_motivation_value_for_lane_change_list.append(value)
+    def pop_y_motivation_value_for_lane_change_list(self):
+        return self.y_motivation_value_for_lane_change_list.pop()
+
     # 車線変更xy座標辞書の取得・設定
     def get_lane_change_xy_dict(self):
         return self.lane_change_xy_dict
     def set_lane_change_xy_dict(self, lane_change_xy_dict:dict):
         self.lane_change_xy_dict = lane_change_xy_dict
 
-    # 避難地を変更した運転者に追従する閾値の取得・設定
-    def get_following_threshold(self):
-        return self.following_threshold
-    def set_following_threshold(self, following_threshold:int):
-        self.following_threshold = following_threshold
-    
-    # 正常性バイアスによるモチベの下がり具合の取得・設定
-    def get_normalcy_lane_change_motivation(self):
-        return self.normalcy_lane_change_motivation
-    def set_normalcy_lane_change_motivation(self, normalcy_lane_change_motivation:int):
-        self.normalcy_lane_change_motivation = normalcy_lane_change_motivation
-    
     # エージェント作成時間の取得・設定
     def get_created_time(self):
         return self.created_time
     def set_created_time(self, created_time:int):
         self.created_time = created_time
-    
+
     # 避難地到着時間の取得・設定
     def get_arrival_time(self):
         return self.arrival_time
     def set_arrival_time(self, arrival_time:int):
         self.arrival_time = arrival_time
-    
+
     # エージェント作成時間設定フラグの取得・設定
     def get_created_time_flg(self):
         return self.created_time_flg
     def set_created_time_flg(self, created_time_flg:bool):
         self.created_time_flg = created_time_flg
+
+    # 車線変更時間の取得・設定
+    def get_lane_change_time(self):
+        return self.lane_change_time
+    def set_lane_change_time(self, lane_change_time:float):
+        self.lane_change_time = lane_change_time
+
+    # 車線変更動機付けの最小値に到達した時間の取得・設定
+    def get_reach_lane_minimum_motivation_time(self):
+        return self.reach_lane_minimum_motivation_time
+    def set_reach_lane_minimum_motivation_time(self, reach_lane_minimum_motivation_time:float):
+        self.reach_lane_minimum_motivation_time = reach_lane_minimum_motivation_time
 
     #　駐車フラグの取得・設定
     def get_shelter_flg(self):
@@ -211,6 +236,18 @@ class Agent():
         return self.normalcy_lane_change_motivation_flg
     def set_normalcy_lane_change_motivation_flg(self, normalcy_lane_change_motivation_flg:bool):
         self.normalcy_lane_change_motivation_flg = normalcy_lane_change_motivation_flg
+    
+    # 加速フラグの取得・設定
+    def get_acceleration_flag(self):
+        return self.acceleration_flag
+    def set_acceleration_flag(self, acceleration_flag:bool):
+        self.acceleration_flag = acceleration_flag
+    
+    # 車線変更動機付けの最小値フラグの取得・設定
+    def get_lane_minimum_motivation_value_flg(self):
+        return self.lane_minimum_motivation_value_flg
+    def set_lane_minimum_motivation_value_flg(self, lane_minimum_motivation_value_flg:bool):
+        self.lane_minimum_motivation_value_flg = lane_minimum_motivation_value_flg
 
     #　エージェントの情報を表示
     def print_info(self):

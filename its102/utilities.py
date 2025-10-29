@@ -234,7 +234,7 @@ def generate_new_veh_based_on_route_time(target_vehID:str, NEW_VEHICLE_COUNT:int
     traci.route.add(routeID=new_route_ID, edges=via_edgeIDs_with_intial_end_edge)
     traci.vehicle.add(vehID=new_veh_ID, routeID=new_route_ID, depart=deparet_time, departPos=depart_position)
     traci.vehicle.setParkingAreaStop(vehID=new_veh_ID, stopID=new_shelterID, duration=100000)
-    traci.vehicle.setColor(new_veh_ID, (128, 249, 255, 255))
+    # traci.vehicle.setColor(new_veh_ID, (128, 249, 255, 255))
     NEW_VEHICLE_COUNT += 1
     # print(f"normacy is changed evacuation") 
     return NEW_VEHICLE_COUNT
@@ -250,7 +250,7 @@ def generate_new_veh(
     connected_edges_list: list,
     LATE_AGENT_THRESHOLD_LIST: list,
     lane_change_mode: int
-):
+    ):
     """
     既存車両 target_vehID を基点に、候補避難地のうち新たな避難地へ向かう
     新規車両を生成して置き換える。
@@ -301,23 +301,27 @@ def generate_new_veh(
     updated_candidate_shelter = agent_by_target_vehID.get_candidate_shelter()
 
     agent: Agent = Agent(
-        vehID=new_veh_ID,
-        target_shelter=new_shelterID,
-        tunning_threshold=copy.deepcopy(agent_by_target_vehID.get_tunning_threshold()),
-        route_change_threshold=copy.deepcopy(agent_by_target_vehID.get_route_change_threshold()),
-        lane_change_init_threshold=copy.deepcopy(agent_by_target_vehID.get_lane_change_threshold_list()[-1])
-    )
-    agent.set_near_edgeID_by_target_shelter(
-        copy.deepcopy(agent_by_target_vehID.get_near_edgeID_by_target_shelter())
-    )
+                            vehID=new_veh_ID,
+                            target_shelter=new_shelterID,
+                            tunning_threshold=copy.deepcopy(agent_by_target_vehID.get_tunning_threshold()),
+                            route_change_threshold=copy.deepcopy(agent_by_target_vehID.get_route_change_threshold()),
+                            lane_change_init_threshold=copy.deepcopy(agent_by_target_vehID.get_lane_change_decision_threshold()),
+                            normalcy_motivation_increase=copy.deepcopy(agent_by_target_vehID.get_motivation_increase_from_info_receive()),
+                            motivation_decrease_due_to_inactive_neighbors=copy.deepcopy(agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()),
+                            motivation_increase_due_to_following_neighbors=copy.deepcopy(agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()),
+                            lane_minimum_motivation_value=copy.deepcopy(agent_by_target_vehID.get_minimum_motivation_value())
+                            )
+    agent.set_near_edgeID_by_target_shelter(copy.deepcopy(agent_by_target_vehID.get_near_edgeID_by_target_shelter()))
     agent.set_candidate_edge_by_shelterID(updated_candidate_shelter)
     agent.init_set_candidate_near_shelter(shelter_edge_by_IDs=updated_candidate_shelter)
-    agent.set_x_lane_change(copy.deepcopy(agent_by_target_vehID.get_x_lane_change()))
-    agent.set_y_lane_change(copy.deepcopy(agent_by_target_vehID.get_y_lane_change()))
+
+    agent.set_x_elapsed_time_for_lane_change_list(copy.deepcopy(agent_by_target_vehID.get_x_elapsed_time_for_lane_change_list()))
+    agent.set_y_motivation_value_for_lane_change_list(copy.deepcopy(agent_by_target_vehID.get_y_motivation_value_for_lane_change_list()))
     agent.set_lane_change_xy_dict(copy.deepcopy(agent_by_target_vehID.get_lane_change_xy_dict()))
-    agent.set_current_lane_change_motivation(copy.deepcopy(agent_by_target_vehID.get_current_lane_change_motivation()))
-    agent.set_lane_change_threshold_list(copy.deepcopy(agent_by_target_vehID.get_lane_change_threshold_list()))
-    agent.set_time_lane_change_list(copy.deepcopy(agent_by_target_vehID.get_time_lane_change_list()))
+
+    agent.set_motivation_decrease_due_to_inactive_neighbors(copy.deepcopy(agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()))
+    agent.set_motivation_increase_due_to_following_neighbors(copy.deepcopy(agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()))
+    agent.set_calculated_motivation_value(copy.deepcopy(agent_by_target_vehID.get_calculated_motivation_value()))
     agent_list.append(agent)
 
     # === VehicleInfo を継承して新規作成 ===
@@ -612,7 +616,7 @@ def init_vehicleInfo_list(vehIDs: list, shelter_list: list):
         vehInfo_list.append(vehicleInfo)
     return vehInfo_list
 
-def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD_LIST:list, LATE_AGENT_THRESHOLD_LIST:list, ATTR_RATE:double):
+def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD_LIST:list, LATE_AGENT_THRESHOLD_LIST:list, ATTR_RATE:double, MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS:float, MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS:float):
     agent_list = []
     for vehID in vehIDs:
         # せっかちな人はこっち
@@ -622,31 +626,36 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(EARLY_AGENT_THRESHOLD_LIST[0], EARLY_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=max(0, random.gauss(mu=60, sigma=30)),
-                            lane_change_init_threshold=random.uniform(1000, 1500)
+                            lane_change_init_threshold=random.uniform(800, 1200),
+                            normalcy_motivation_increase=random.uniform(700, 900),
+                            motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
+                            motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
+                            lane_minimum_motivation_value=random.uniform(500, 700)
                             )
-            agent.set_normalcy_lane_change_motivation(random.uniform(700, 900))
         else:
             agent:Agent = Agent(
                             vehID=vehID, 
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(LATE_AGENT_THRESHOLD_LIST[0], LATE_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=random.gauss(mu=-60, sigma=20),
-                            lane_change_init_threshold=random.uniform(1000, 1500)
+                            lane_change_init_threshold=random.uniform(1500, 1900),
+                            normalcy_motivation_increase=random.uniform(500, 700),
+                            motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
+                            motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
+                            lane_minimum_motivation_value=random.uniform(300, 500)
                             )
-            agent.set_normalcy_lane_change_motivation(random.uniform(300, 500))
 
         agent.set_near_edgeID_by_target_shelter(edgeID_by_shelterID[vehID.split("_")[1] + "_" + vehID.split("_")[2]])
         agent.init_set_candidate_near_shelter(shelter_edge_by_IDs=edgeID_by_shelterID)
-        agent.init_lane_change_threshold_list()
-        agent.init_time_lane_change_list()
         agent.set_candidate_edge_by_shelterID(edgeID_by_shelterID)
-        x_values = np.arange(0, 600, 1)
-        y_values = [two_stage_sigmoid(x) for x in x_values]
-        agent.set_x_lane_change(x_values.tolist())
-        agent.set_y_lane_change(y_values)
-        lane_changet_xy_dict = dict(zip(x_values.tolist(), y_values))
-        # セッターメソッドを使って agent インスタンスに辞書を設定
-        agent.set_lane_change_xy_dict(lane_changet_xy_dict)
+        # ここは必須
+        x_values = np.arange(0, 450, 1)
+        y_values = [float(two_stage_sigmoid(x)) for x in x_values]
+        agent.set_x_elapsed_time_for_lane_change_list(x_values.tolist())
+        agent.set_y_motivation_value_for_lane_change_list(y_values)
+        # ここまで必須
+        lane_change_xy_dict = dict(zip(x_values.tolist(), y_values))
+        agent.set_lane_change_xy_dict(lane_change_xy_dict)
         agent_list.append(agent)
     return agent_list
 
@@ -907,21 +916,15 @@ def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list):
         if len(parts) == 2:
             edge_ID = parts[0]
             lane_index = int(parts[1]) # 文字列 '0' を 整数 0 に変換
-            # 2. レーンインデックスを +1 する
             another_lane_index = lane_index + 1
-            # 3. 'E7' と '1' を 'E7_1' として再結合
             another_lane_ID = f"{edge_ID}_{another_lane_index}"
             another_lane_vehIDs = traci.lane.getLastStepVehicleIDs(another_lane_ID)
-            # if len(another_lane_vehIDs) > 0:
-            #     # print(f'another_lane_vehIDs: {another_lane_vehIDs}')
-            # if len(another_lane_vehIDs) > 0:
-            #     # print(f'test')
+
             for another_lane_vehIDs in another_lane_vehIDs:
                 if another_lane_vehIDs != target_vehID:
-                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < 30:
+                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < 20:
                         return True
-                    # else:
-                        # print(distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)))
+
             return False
     except Exception as e:
         return False
@@ -1086,19 +1089,27 @@ def choose_edge_by_probability(edgeID_list:list, probabilities:list) -> str:
 
     return random.choices(edgeID_list, weights=probabilities, k=1)[0]
 
+import math
+import traci
+
+# --- 周囲密度の計算（既存ロジックを維持） ---
 def get_local_density(vehID: str, radius: float = 100.0) -> float:
     """
-    指定車両の周囲 radius[m] 内にいる車両数を数え、
-    最大10台で正規化（10台で密度1.0）
+    指定車両の周囲 radius[m] 内にいる車両数を数え、最大10台で正規化（10台で密度1.0）
     """
     ego_pos = traci.vehicle.getPosition(vehID)
-    nearby_vehIDs = traci.edge.getLastStepVehicleIDs(traci.vehicle.getRoadID(vehID))
-    prev_edge = get_prev_edge(edgeIDs=nearby_vehIDs, current_edgeID=traci.vehicle.getRoadID(vehID))
-    next_edge = get_next_edge(edgeIDs=nearby_vehIDs, current_edgeID=traci.vehicle.getRoadID(vehID))
+    cur_edge = traci.vehicle.getRoadID(vehID)
+
+    nearby_vehIDs = list(traci.edge.getLastStepVehicleIDs(cur_edge))
+    prev_edge = get_prev_edge(edgeIDs=nearby_vehIDs, current_edgeID=cur_edge)
+    next_edge = get_next_edge(edgeIDs=nearby_vehIDs, current_edgeID=cur_edge)
+
     if prev_edge is not None:
         nearby_vehIDs += traci.edge.getLastStepVehicleIDs(prev_edge)
     if next_edge is not None:
         nearby_vehIDs += traci.edge.getLastStepVehicleIDs(next_edge)
+
+    nearby_vehIDs = list(set(nearby_vehIDs))
     count = 0
 
     for other_vehID in nearby_vehIDs:
@@ -1110,73 +1121,111 @@ def get_local_density(vehID: str, radius: float = 100.0) -> float:
         distance = (dx * dx + dy * dy) ** 0.5
         if distance <= radius:
             count += 1
+
     return min(count / 10.0, 1.0)
 
-import math
 
-def set_speed_by_local_density(vehID: str, local_density: float):
+# --- 密度 → 速度係数 (0.4〜1.0) ---
+def density_to_coeff(local_density: float) -> float:
     """
-    局所密度に応じて速度を滑らかに減少させる。
-    - 3台程度まではほぼ減速なし（密度0.3）
-    - そこから密度が上がると急激に減速
-    - 最低速度は1.5〜2.0 m/s
+    局所密度に応じて速度係数を返す（0.4〜1.0）。
+    密度0.3まではほぼ影響なし、それ以降は滑らかに低下。
     """
-    base_speed = 6.0  # [m/s]
-    min_speed = 2.5   # [m/s]
-    min_speed_dense = 2.0  # 非常に密なときの下限上げ
-
-    # --- シグモイド関数（滑らかに減速）---
-    k = 12.0          # 急峻さ
+    k = 12.0          # 勾配
     inflection = 0.35 # 折れ点（約3台）
-
-    slow_factor = 1 / (1 + math.exp(k * (local_density - inflection)))
-
-    # 極端に密な場合（>0.9）は下限速度を少し上げて安定化
-    if local_density > 0.9:
-        min_speed = min_speed_dense
-
-    new_speed = max(min_speed, base_speed * slow_factor)
-    traci.vehicle.setMaxSpeed(vehID, new_speed)
+    slow_factor = 1 / (1 + math.exp(k * (local_density - inflection)))  # 0〜1
+    coeff = 0.4 + 0.6 * slow_factor
+    return max(0.4, min(1.0, coeff))
 
 
-# def set_speed_by_local_density(vehID: str, local_density: float):
-#     base_speed = 6.0  # m/s
-#     min_speed = 0.5   # m/s
-#     exponent = 2.0    # 密なときに強烈に減速
+# --- ギャップ → 基本速度 ---
+def speed_from_gap(gap: float, v_free: float, v_min: float, gap_min: float, tau: float) -> float:
+    """
+    gap<=gap_min では v_min、gapが大きいほど (gap-gap_min)/tau に比例して速度上昇。
+    """
+    if gap is None:
+        return v_free
+    if gap <= gap_min:
+        return v_min
+    v = (gap - gap_min) / max(tau, 1e-3)
+    return max(v_min, min(v_free, v))
 
-#     slow_factor = (1 - local_density) ** exponent
 
-#     # 補正：密度が0.8以上なら更に2倍遅くする
-#     if local_density > 0.8:
-#         slow_factor *= 0.8
-#     new_speed = max(min_speed, base_speed * slow_factor)
-#     traci.vehicle.setMaxSpeed(vehID, new_speed)
+# --- 平滑化処理（ジャーク抑制） ---
+_prev_speed_cmd = {}
 
-# def get_local_density(vehID: str, radius: float = 100.0) -> float:
-#     """
-#     指定車両の周囲 radius[m] 内にいる車両数を数え、
-#     最大10台で正規化（10台で密度1.0）
-#     """
-#     ego_pos = traci.vehicle.getPosition(vehID)
-#     nearby_vehIDs = traci.edge.getLastStepVehicleIDs(traci.vehicle.getRoadID(vehID))
-#     prev_edge = get_prev_edge(edgeIDs=nearby_vehIDs, current_edgeID=traci.vehicle.getRoadID(vehID))
-#     next_edge = get_next_edge(edgeIDs=nearby_vehIDs, current_edgeID=traci.vehicle.getRoadID(vehID))
-#     if prev_edge is not None:
-#         nearby_vehIDs += traci.edge.getLastStepVehicleIDs(prev_edge)
-#     if next_edge is not None:
-#         nearby_vehIDs += traci.edge.getLastStepVehicleIDs(next_edge)
-#     count = 0
+def smooth_speed_command(vehID: str, v_des: float, alpha: float = 0.5) -> float:
+    """
+    前回速度との指数移動平均をとることで急加減速を防ぐ。
+    alphaを下げるほど平滑（0.3〜0.5が推奨）。
+    """
+    v_prev = _prev_speed_cmd.get(vehID, v_des)
+    v_cmd = (1 - alpha) * v_prev + alpha * v_des
+    _prev_speed_cmd[vehID] = v_cmd
+    return v_cmd
 
-#     for other_vehID in nearby_vehIDs:
-#         if other_vehID == vehID:
-#             continue
-#         other_pos = traci.vehicle.getPosition(other_vehID)
-#         dx = ego_pos[0] - other_pos[0]
-#         dy = ego_pos[1] - other_pos[1]
-#         distance = (dx * dx + dy * dy) ** 0.5
-#         if distance <= radius:
-#             count += 1
-#     return min(count / 10.0, 1.0)
+
+# --- メイン：ギャップ×密度の合成速度を適用 ---
+def apply_gap_density_speed_control(
+        vehID: str,
+        local_density: float,
+        v_free: float,
+        v_min: float,
+        gap_min: float,
+        tau: float,
+        alpha: float,
+        slow_time: float
+    ):
+    """
+    1. 前方車までのギャップから目標速度 v_gap を算出
+    2. 局所密度から係数を掛けて最終速度 v_des を決定
+    3. 平滑化して jerk を抑え、slowDown で適用
+    """
+    lead_info = traci.vehicle.getLeader(vehID)
+    gap = lead_info[1] if lead_info is not None else None
+
+    v_gap = speed_from_gap(gap, v_free=v_free, v_min=v_min, gap_min=gap_min, tau=tau)
+    coeff = density_to_coeff(local_density)
+    v_des = v_gap * coeff
+    v_cmd = smooth_speed_command(vehID, v_des, alpha=alpha)
+
+    traci.vehicle.slowDown(vehID, v_cmd, max(0.1, slow_time))
+
+# レーン変更の意思決定箇所
+def lane_change_by_vehID(vehID: str, agent: Agent, vehInfo: VehicleInfo):
+    leader_info = traci.vehicle.getLeader(vehID)
+    speed = traci.vehicle.getSpeed(vehID)
+
+    # 条件：
+    # 前方に車両が存在し（leader_infoがNoneでない）
+    # 距離が近い（例: 20m未満）
+    # 自車速度が遅い（例: 5.0 m/s 未満）
+    if (leader_info is not None and leader_info[1] < 20.0) and (speed < 6.0):
+        # print(f"vehID:{vehID}, spped:{traci.vehicle.getSpeed(vehID)}, leader_info:{leader_info}")
+        try:
+            # レーン変更（右 or 左 laneIndex は環境に合わせて調整）
+            traci.vehicle.changeLane(vehID=vehID, laneIndex=1, duration=1000)
+        except Exception as e:
+            print(f"Error changing lane for vehicle {vehID}: {e}")
+            return False  # 例外時はFalseを返す
+
+        # レーン変更後の設定
+        init_driver_behavior(vehIDs=[vehID], lane_change_mode=512)
+        traci.vehicle.setParkingAreaStop(vehID=vehID, stopID="ShelterA_2", duration=100000)
+        traci.vehicle.setSpeed(vehID, 9.0)
+        vehInfo.set_target_shelter("ShelterA_2")
+
+        # フラグと記録更新
+        agent.set_evacuation_route_changed_flg(True)
+        elapsed = traci.simulation.getTime() - agent.get_created_time()
+        agent.set_lane_change_time(elapsed)
+
+        # print(f"[LaneChange] vehID={vehID} | 距離={leader_info[1]:.1f}m | 速度={speed:.1f}m/s | 時刻={elapsed:.1f}s")
+
+        return True  # 成功時はTrueを返す
+
+    # 条件を満たさなかった場合（前が空いている or 速度が速い）
+    return False
 
 def merge_route_info_within_shelters(one_shelter:Shelter, another_shelter:Shelter):
     one_shelter_has_route_info = one_shelter.get_avg_evac_time_by_route()
@@ -1253,7 +1302,7 @@ def merge_arrival_vehs_of_shelter(shelter_list: List[Shelter]):
 
         shelter.set_total_arrival_vehIDs(total)
 
-def is_vehID_in_congested_edge(vehID:str, THRESHOLD_SPEED, custome_edge_list:list):
+def is_vehID_in_congested_edge(vehID:str, THRESHOLD_SPEED):
     # 車両が通過するエッジが混雑しているか判定
     current_edgeID = traci.vehicle.getRoadID(vehID)
     edgeIDs_of_target_vehID = traci.route.getEdges(traci.vehicle.getRouteID(vehID))
@@ -1417,19 +1466,31 @@ def plot_dot(agent: Agent):
     """
     fig, ax = plt.subplots(figsize=(6, 5))
     # --- 散布図 ---
-    ax.scatter(agent.get_x_lane_change()[:-1], agent.get_y_lane_change()[:-1], color='black', s=30, label="Data points")
-    ax.scatter(agent.get_time_lane_change_list()[:-1], agent.get_lane_change_threshold_list()[:-1], color='blue', s=50, label="Lane change thresholds")
-    if agent.get_x_lane_change(): 
-        ax.scatter(agent.get_x_lane_change()[-1], agent.get_y_lane_change()[-1], color='orange', s=30)
-    if agent.get_time_lane_change_list():
-        ax.scatter(agent.get_time_lane_change_list()[-1], agent.get_lane_change_threshold_list()[-1], color='red', s=50)
+    ax.plot(
+            agent.get_x_elapsed_time_for_lane_change_list(),
+            agent.get_y_motivation_value_for_lane_change_list(),
+            linewidth=2,
+            label="Motivation over time"
+            )  
+    print(f"agent.get_lane_change_time(){agent.get_lane_change_time()}, agent.get_calculated_motivation_value(){agent.get_calculated_motivation_value()}")
+    # ax.scatter(agent.get_lane_change_time(), agent.get_calculated_motivation_value(), color='orange', s=30, label="Data points")
+    y_thr = agent.get_lane_change_decision_threshold()
+    x_reach_min_motivation = agent.get_reach_lane_minimum_motivation_time()
+    ax.axhline(y=y_thr, color="red", linestyle="--", linewidth=1.5, label=f"Threshold = {y_thr:.2f}")
+    ax.axvline(x=x_reach_min_motivation, color="red", linestyle="--", linewidth=1.5, label=f"reach min time = {y_thr:.2f}")
+    try:
+        y_cur = agent.get_calculated_motivation_value()
+        ax.axhline(y=y_cur, color="green", linestyle="--", linewidth=1.5, label=f"Current Value = {y_cur:.2f}")
+    except:
+        pass
 
     # --- グラフ設定 ---
+    ax.legend(loc="best")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.grid(True, linestyle="--", alpha=0.5)
     plt.tight_layout()
-    # plt.show()
+    plt.show()
 
 #TODO 消去かしょ
 def update_agent_lane_change_motivation(agent:Agent):
@@ -1450,13 +1511,13 @@ def two_stage_sigmoid(value: float):
     import numpy as np
 
     k1 = 0.015   # 緩やかな傾き
-    x01 = 100    # 軽い上昇の中心
+    x01 = 200    # 軽い上昇の中心
     
     k2 = 0.045   # 急な立ち上がり
-    x02 = 150    # 急上昇の中心
+    x02 = 330    # 急上昇の中心
     
     ymin = 0
-    ymax = 2000
+    ymax = 1000
 
     s1 = 1 / (1 + np.exp(-k1 * (value - x01)))
     s2 = 1 / (1 + np.exp(-k2 * (value - x02)))
