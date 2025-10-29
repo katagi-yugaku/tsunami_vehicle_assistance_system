@@ -36,8 +36,8 @@ from ...agents.VehicleInfo import VehicleInfo
 # =========================
 # Runtime config / seeds
 # =========================
-random.seed(318)  # 乱数シードを固定（再現性）
-# random.seed()
+# random.seed(318)  # 乱数シードを固定（再現性）
+random.seed()
 
 COMMUNICATION_RANGE = 100
 END_SIMULATION_TIME = 1500
