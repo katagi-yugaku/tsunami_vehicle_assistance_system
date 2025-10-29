@@ -560,6 +560,6 @@ if __name__ == "__main__":
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
     
-    for agent in agent_list:
-        if agent.get_vehID() == "init_ShelterA_1_116":
-            utilities.plot_dot(agent)
+    # for agent in agent_list:
+    #     if agent.get_vehID() == "init_ShelterA_1_116":
+    #         utilities.plot_dot(agent)
