@@ -39,6 +39,7 @@ from ...agents.VehicleInfo import VehicleInfo
 # random.seed(318)  # 乱数シードを固定（再現性）
 random.seed()
 
+
 COMMUNICATION_RANGE = 100
 END_SIMULATION_TIME = 2000
 VEHICLE_NUM = 0
