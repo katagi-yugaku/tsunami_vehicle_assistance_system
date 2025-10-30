@@ -626,8 +626,8 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(EARLY_AGENT_THRESHOLD_LIST[0], EARLY_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=max(0, random.gauss(mu=60, sigma=30)),
-                            lane_change_init_threshold=random.uniform(1000, 1500),
-                            normalcy_motivation_increase=random.uniform(1200, 1500),
+                            lane_change_init_threshold=random.uniform(800, 1000),
+                            normalcy_motivation_increase=random.uniform(700, 1000),
                             motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
                             motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
                             lane_minimum_motivation_value=random.uniform(500, 700)
@@ -638,8 +638,8 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(LATE_AGENT_THRESHOLD_LIST[0], LATE_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=random.gauss(mu=-60, sigma=20),
-                            lane_change_init_threshold=random.uniform(1000, 1500),
-                            normalcy_motivation_increase=random.uniform(700, 1000),
+                            lane_change_init_threshold=random.uniform(800, 1000),
+                            normalcy_motivation_increase=random.uniform(400, 700),
                             motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
                             motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
                             lane_minimum_motivation_value=random.uniform(500, 700)
@@ -922,7 +922,7 @@ def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list):
 
             for another_lane_vehIDs in another_lane_vehIDs:
                 if another_lane_vehIDs != target_vehID:
-                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < 20:
+                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < 30:
                         return True
 
             return False
@@ -1198,7 +1198,7 @@ def lane_change_by_vehID(vehID: str, agent: Agent, vehInfo: VehicleInfo):
     # 前方に車両が存在し（leader_infoがNoneでない）
     # 距離が近い（例: 20m未満）
     # 自車速度が遅い（例: 5.0 m/s 未満）
-    if (leader_info is not None and leader_info[1] < 20.0) and (speed < 6.0):
+    if (leader_info is not None and leader_info[1] < 20.0) and (speed < 7.0):
         # print(f"vehID:{vehID}, spped:{traci.vehicle.getSpeed(vehID)}, leader_info:{leader_info}")
         try:
             # レーン変更（右 or 左 laneIndex は環境に合わせて調整）

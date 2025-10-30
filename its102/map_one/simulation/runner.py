@@ -56,14 +56,16 @@ VEH_START_TIME_BY_SHELTERID = {"ShelterA_1": 0, "ShelterA_2": 0} # 避難所ご�
 TOTAL_VEHNUM = 150
 NEW_VEHICLE_COUNT = 0
 LANE_CHANGED_VEHICLE_COUNT = 0
+OBTAIN_INFO_LANE_CHANFE_COUNT = 0
+ELAPSED_TIME_LANE_CHANGE_COUNT = 0
 NORMALCY_BIAS_COUNT = 0
 POSITIVE_MAJORITY_BIAS_COUNT = 0
 NEGATIVE_MAJORITY_BIAS_COUNT = 0
 TSUNAMI_PRECURSOR_INFO_OBTAIN_TIME = 0
-DECISION_EVALUATION_INTERVAL_FOR_INITIAL = 20.0
-DECISION_EVALUATION_INTERVAL = 20.0
+DECISION_EVALUATION_INTERVAL_FOR_INITIAL = 10.0
+DECISION_EVALUATION_INTERVAL = 10.0
 MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS = 100.0
-MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 250.0
+MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 150.0
 
 # リストの初期化
 custome_edge_list: list = []
@@ -96,6 +98,8 @@ def control_vehicles(majority_bias_score: float):
     global POSITIVE_MAJORITY_BIAS_COUNT
     global NEGATIVE_MAJORITY_BIAS_COUNT
     global NORMALCY_BIAS_COUNT
+    global OBTAIN_INFO_LANE_CHANFE_COUNT
+    global ELAPSED_TIME_LANE_CHANGE_COUNT
     # 現在の存在するrouteを確認する
     for routeID in traci.route.getIDList():
         # 現在のrouteを取得
@@ -224,6 +228,7 @@ def control_vehicles(majority_bias_score: float):
                                                                                 )
                             if success_lane_change:
                                 # print("変更1！！！！")
+                                ELAPSED_TIME_LANE_CHANGE_COUNT += 1
                                 LANE_CHANGED_VEHICLE_COUNT += 1
                                 agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                 
@@ -257,6 +262,7 @@ def control_vehicles(majority_bias_score: float):
                     NORMALCY_BIAS_COUNT += 1
                     # 閾値判定（※仕様に合わせて < / >= を選択）
                     if agent_by_current_vehID.get_calculated_motivation_value() >= agent_by_current_vehID.get_lane_change_decision_threshold():
+                        # print("津波情報取得による避難行動発生")
                         success_lane_change = utilities.lane_change_by_vehID(
                                                                                 vehID=current_vehID,
                                                                                 agent=agent_by_current_vehID,
@@ -264,6 +270,7 @@ def control_vehicles(majority_bias_score: float):
                                                                             )
                         if success_lane_change:
                             LANE_CHANGED_VEHICLE_COUNT += 1
+                            OBTAIN_INFO_LANE_CHANFE_COUNT += 1
                             # print("変更2！！！！")
                             agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                     continue
@@ -348,7 +355,7 @@ def control_vehicles(majority_bias_score: float):
                             agent_by_current_vehID.set_y_motivation_value_for_lane_change_list(y_list)
                             # XY 対応表も再構築
                             agent_by_current_vehID.set_lane_change_xy_dict(dict(zip(x_list, y_list)))
-                        NEGATIVE_MAJORITY_BIAS_COUNT += 1 
+
                         if agent_by_current_vehID.get_calculated_motivation_value() >= agent_by_current_vehID.get_lane_change_decision_threshold():
                             success_lane_change = utilities.lane_change_by_vehID(
                                                                                     vehID=current_vehID,
@@ -357,6 +364,7 @@ def control_vehicles(majority_bias_score: float):
                                                                                 )
                             if success_lane_change:
                                 LANE_CHANGED_VEHICLE_COUNT += 1
+                                NEGATIVE_MAJORITY_BIAS_COUNT += 1 
                                 # print("変更3！！！！")
                                 agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                     # 周囲が避難行動を取る場合、周囲の行動に同調するため、自身の閾値を上昇させる
@@ -368,7 +376,7 @@ def control_vehicles(majority_bias_score: float):
                         inc = float(agent_by_current_vehID.get_motivation_increase_due_to_following_neighbors())
                         new_motivation = current_motivation + inc
                         agent_by_current_vehID.set_calculated_motivation_value(new_motivation)
-                        POSITIVE_MAJORITY_BIAS_COUNT += 1 
+
                         # ここで負の同調性バイアスが再度働くように設定
                         agent_by_current_vehID.set_lane_minimum_motivation_value_flg(False)
 
@@ -398,6 +406,7 @@ def control_vehicles(majority_bias_score: float):
                                                                                 )
                             if success_lane_change:
                                 LANE_CHANGED_VEHICLE_COUNT += 1
+                                POSITIVE_MAJORITY_BIAS_COUNT += 1 
                                 # print(f"vehID: {current_vehID} 変更4！！！！　")
                                 agent_by_current_vehID.set_evacuation_route_changed_flg(True)
 
@@ -552,7 +561,8 @@ if __name__ == "__main__":
     run(majority_bias_score=majority_bias_score)
     print("===== Simlation Result Summary =====")
     print("LANE_CHANGED_VEHICLE_NUM:", LANE_CHANGED_VEHICLE_COUNT)
-    print("ROUTE_CHANGED_VEHICLE_NUM:", NEW_VEHICLE_COUNT)
+    print("OBTAIN_INFO_LANE_CHANFE_COUNT:", OBTAIN_INFO_LANE_CHANFE_COUNT)
+    print("ELAPSED_TIME_LANE_CHANGE_COUNT:", ELAPSED_TIME_LANE_CHANGE_COUNT) 
     print("NORMALCY_BIAS_COUNT:", NORMALCY_BIAS_COUNT)
     print("NEGATIVE_MAJORITY_BIAS_COUNT:", NEGATIVE_MAJORITY_BIAS_COUNT)
     print("POSITIVE_MAJORITY_BIAS_COUNT:", POSITIVE_MAJORITY_BIAS_COUNT)
