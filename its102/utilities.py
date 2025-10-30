@@ -626,8 +626,8 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(EARLY_AGENT_THRESHOLD_LIST[0], EARLY_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=max(0, random.gauss(mu=60, sigma=30)),
-                            lane_change_init_threshold=random.uniform(800, 1200),
-                            normalcy_motivation_increase=random.uniform(700, 900),
+                            lane_change_init_threshold=random.uniform(1000, 1500),
+                            normalcy_motivation_increase=random.uniform(1200, 1500),
                             motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
                             motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
                             lane_minimum_motivation_value=random.uniform(500, 700)
@@ -638,11 +638,11 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(LATE_AGENT_THRESHOLD_LIST[0], LATE_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=random.gauss(mu=-60, sigma=20),
-                            lane_change_init_threshold=random.uniform(1500, 1900),
-                            normalcy_motivation_increase=random.uniform(500, 700),
+                            lane_change_init_threshold=random.uniform(1000, 1500),
+                            normalcy_motivation_increase=random.uniform(700, 1000),
                             motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
                             motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
-                            lane_minimum_motivation_value=random.uniform(300, 500)
+                            lane_minimum_motivation_value=random.uniform(500, 700)
                             )
 
         agent.set_near_edgeID_by_target_shelter(edgeID_by_shelterID[vehID.split("_")[1] + "_" + vehID.split("_")[2]])
@@ -1089,8 +1089,6 @@ def choose_edge_by_probability(edgeID_list:list, probabilities:list) -> str:
 
     return random.choices(edgeID_list, weights=probabilities, k=1)[0]
 
-import math
-import traci
 
 # --- 周囲密度の計算（既存ロジックを維持） ---
 def get_local_density(vehID: str, radius: float = 100.0) -> float:

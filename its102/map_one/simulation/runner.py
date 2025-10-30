@@ -40,7 +40,7 @@ from ...agents.VehicleInfo import VehicleInfo
 random.seed()
 
 COMMUNICATION_RANGE = 100
-END_SIMULATION_TIME = 1500
+END_SIMULATION_TIME = 2000
 VEHICLE_NUM = 0
 DEPART_TIME: double = 0.0
 ROUTE_NUM = 0
@@ -63,7 +63,7 @@ TSUNAMI_PRECURSOR_INFO_OBTAIN_TIME = 0
 DECISION_EVALUATION_INTERVAL_FOR_INITIAL = 20.0
 DECISION_EVALUATION_INTERVAL = 20.0
 MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS = 100.0
-MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 150.0
+MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 250.0
 
 # リストの初期化
 custome_edge_list: list = []
@@ -275,7 +275,8 @@ def control_vehicles(majority_bias_score: float):
                         and agent_by_current_vehID.get_normalcy_lane_change_motivation_flg()):
                     
                     # 周囲が避難行動を取らない場合、自身も合わせようとするため、閾値が減少
-                    if not utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list) and not agent_by_current_vehID.get_lane_minimum_motivation_value_flg():
+                    if (not utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list) 
+                        and not agent_by_current_vehID.get_lane_minimum_motivation_value_flg()):
                         elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time()
                         # 現在値を更新してから、情報受領分を上乗せ
                         agent_by_current_vehID.update_calculated_motivation_value(current_time=elapsed_time)
@@ -368,6 +369,9 @@ def control_vehicles(majority_bias_score: float):
                         new_motivation = current_motivation + inc
                         agent_by_current_vehID.set_calculated_motivation_value(new_motivation)
                         POSITIVE_MAJORITY_BIAS_COUNT += 1 
+                        # ここで負の同調性バイアスが再度働くように設定
+                        agent_by_current_vehID.set_lane_minimum_motivation_value_flg(False)
+
                         # ここからが修正ポイント：履歴の「該当 index 以降」に一括加算する
                         x_list = list(agent_by_current_vehID.get_x_elapsed_time_for_lane_change_list())
                         y_list = list(agent_by_current_vehID.get_y_motivation_value_for_lane_change_list()) 
@@ -559,7 +563,6 @@ if __name__ == "__main__":
         print("OK all vehs arrived ")
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
-    
     # for agent in agent_list:
     #     if agent.get_vehID() == "init_ShelterA_1_116":
     #         utilities.plot_dot(agent)
