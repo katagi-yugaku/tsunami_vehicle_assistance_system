@@ -296,5 +296,18 @@ if __name__ == "__main__":
             vals = [em.get(key, 0) for em in nosys_runs["ext"]]
             avg_extra_metrics_with_nosystem[er][key] = sum(vals) / len(vals)
 
-    # 以降のログ出力／CDF描画は元のままでOK
-    # ...
+    # ログ出力（system / nosystem ともに5項目の平均を含む）
+    log_filename = f"log_tsunami.txt"
+    try:
+        with open(log_filename, "w", encoding="utf-8") as f:
+            f.write(f"{datetime.datetime.now()} veh interval:{vehicle_interval}\n")
+            f.write(f"system simulation\n")
+            f.write(f"{avg_arrival_by_vehID_with_system}\n")
+            f.write(f"{avg_changed_vehicle_num_with_system}\n")
+            f.write(f"{avg_extra_metrics_with_system}\n")
+            f.write(f"nosystem simulation\n")
+            f.write(f"{avg_arrival_by_vehID_with_nosystem}\n")
+            f.write(f"{avg_changed_vehicle_num_with_nosystem}\n")
+            f.write(f"{avg_extra_metrics_with_nosystem}\n")
+    except Exception as e:
+        print(f"Error writing to log file: {e}")
