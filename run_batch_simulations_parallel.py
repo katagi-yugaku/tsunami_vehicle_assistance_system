@@ -37,7 +37,6 @@ vehicle_interval = 5.0
 
 # 追加集計のキー（stdoutで "KEY: <int>" 形式を想定）
 ADDITIONAL_KEYS = [
-    "INSIGHT_RANGE",
     "OBTAIN_INFO_LANE_CHANGE_COUNT",
     "ELAPSED_TIME_LANE_CHANGE_COUNT",
     "NORMALCY_BIAS_COUNT",
