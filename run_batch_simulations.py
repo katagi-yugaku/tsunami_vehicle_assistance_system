@@ -8,15 +8,12 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 import datetime
+import re
+from collections import defaultdict
+
+_ID_RE = re.compile(r'^(?:init|newveh)_ShelterA_1_(\d+)(?:_\d+)?$')
 
 # --- ユーザー設定 ---
-
-# 試行する early_rate のリスト
-EARLY_RATES = [0.1, 0.5, 0.9]
-
-# 各 early_rate ごとに実行するシミュレーションの回数
-NUM_RUNS = 2
-
 # 実行するシミュレーションスクリプトのモジュール名
 SIM_SCRIPTS = [
     "its102.map_one.simulation.runner",
@@ -31,7 +28,7 @@ OUTPUT_JSON_FILE = "simulation_averages.json"
 
 script_name_with_system = "its102.map_one.simulation.runner"
 script_name_with_nosystem = "its102.map_one.simulation.runner_nosystem"
-NUM_RUNS = 50
+NUM_RUNS = 10
 early_rate_list = [0.1, 0.5, 0.9]
 vehicle_interval = 5.0
 
@@ -190,25 +187,27 @@ def run_simulation_with_nosystem(script_name: str, early_rate: float):
         print(f"Error writing to log file: {e}")
     return arrival_time_by_target_vehID_dict, changed_vehicle_num, extra_metrics
 
-def compute_average_arrival_times(runvehID_arrival_time_dict_per_run_lists:list):
-    from collections import defaultdict
-    arrival_time_by_vehID = defaultdict(list)
+def compute_average_arrival_times(runvehID_arrival_time_dict_per_run_lists):
+    """
+    runvehID_arrival_time_dict_per_run_lists: 各シミュレーション(run)の
+      {vehID(str): arrival_time(float)} を要素にもつリスト
 
-    for runvehID_arrival_time_dict in runvehID_arrival_time_dict_per_run_lists:
-        for vehID, arrival_time in runvehID_arrival_time_dict.items():
-            arrival_time_by_vehID[vehID].append(arrival_time)
+    返り値: {基底ID(int): 平均到着時間(float)} をID昇順で並べたdict
+    """
+    times_by_base_id = defaultdict(list)
 
-    def natural_sort_key(vehID: str):
-        # 文字列中の数字を分割してタプル化 → "init_ShelterA_1_10" < "init_ShelterA_1_2" を正しく扱える
-        return [int(text) if text.isdigit() else text for text in re.split(r'(\d+)', vehID)]
+    for one_run in runvehID_arrival_time_dict_per_run_lists:
+        for veh_key, t in one_run.items():
+            m = _ID_RE.match(veh_key)
+            if not m:
+                # もし別フォーマットが混じっていたらスキップ（必要ならraiseに変更）
+                continue
+            base_id = int(m.group(1))  # 56や120など
+            times_by_base_id[base_id].append(float(t))
 
-    average_by_vehID_dict = dict(
-        sorted(
-            {k: sum(vs) / len(vs) for k, vs in arrival_time_by_vehID.items()}.items(),
-            key=lambda item: natural_sort_key(item[0])
-        )
-    )
-    return average_by_vehID_dict
+    avg_by_id = {i: sum(ts)/len(ts) for i, ts in times_by_base_id.items()}
+    # IDで昇順ソートして辞書化
+    return dict(sorted(avg_by_id.items(), key=lambda kv: kv[0]))
 
 def plot_cdfs(cdf_data_with_system: dict, cdf_data_with_nosystem: dict):
     plt.figure(figsize=(10, 6))
@@ -227,7 +226,6 @@ def plot_cdfs(cdf_data_with_system: dict, cdf_data_with_nosystem: dict):
         cdf = np.arange(1, len(sorted_times)+1) / len(sorted_times)
         print(f"cdf: {cdf}")
         plt.plot(sorted_times, cdf, label=f'nosystem early_rate={early_rate}')
-    print(f"test")
     plt.xlabel("Arrival Time")
     plt.ylabel("CDF")
     plt.title("CDF of Arrival Times (aggregated over runs)")
@@ -261,7 +259,9 @@ if __name__ == "__main__":
             extra_metrics_per_run_lists.append(extra_metrics)
 
         avg_result = compute_average_arrival_times(runvehID_arrival_time_dict_per_run_lists)
+        # print('avg_result:', avg_result)
         avg_arrival_by_vehID_with_system[early_rate] = list(avg_result.values())
+        print('avg_arrival_by_vehID_with_system:', avg_arrival_by_vehID_with_system)
 
         # 既存ロジック準拠（数値を想定）。辞書が来る場合は各自でランナー出力を調整してください。
         avg_changed_vehicle_num_with_system[early_rate] = sum(change_veh_num_per_run_lists) / len(change_veh_num_per_run_lists)
