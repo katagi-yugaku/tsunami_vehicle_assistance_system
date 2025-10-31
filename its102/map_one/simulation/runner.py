@@ -55,7 +55,7 @@ VEH_START_TIME_BY_SHELTERID = {"ShelterA_1": 0, "ShelterA_2": 0} # 避難所ご�
 TOTAL_VEHNUM = 150
 NEW_VEHICLE_COUNT = 0
 LANE_CHANGED_VEHICLE_COUNT = 0
-OBTAIN_INFO_LANE_CHANFE_COUNT = 0
+OBTAIN_INFO_LANE_CHANGE_COUNT = 0
 ELAPSED_TIME_LANE_CHANGE_COUNT = 0
 NORMALCY_BIAS_COUNT = 0
 POSITIVE_MAJORITY_BIAS_COUNT = 0
@@ -558,9 +558,8 @@ if __name__ == "__main__":
         traci.vehicle.setMaxSpeed(vehID, 9.0)
     run(INSIGHT_RANGE=INSIGHT_RANGE)
     print("===== Simlation Result Summary =====")
-    print("INSIGHT_RANGE:", INSIGHT_RANGE)
     print("LANE_CHANGED_VEHICLE_NUM:", LANE_CHANGED_VEHICLE_COUNT)
-    print("OBTAIN_INFO_LANE_CHANFE_COUNT:", OBTAIN_INFO_LANE_CHANFE_COUNT)
+    print("OBTAIN_INFO_LANE_CHANGE_COUNT:", OBTAIN_INFO_LANE_CHANGE_COUNT)
     print("ELAPSED_TIME_LANE_CHANGE_COUNT:", ELAPSED_TIME_LANE_CHANGE_COUNT) 
     print("NORMALCY_BIAS_COUNT:", NORMALCY_BIAS_COUNT)
     print("NEGATIVE_MAJORITY_BIAS_COUNT:", NEGATIVE_MAJORITY_BIAS_COUNT)
@@ -572,6 +571,6 @@ if __name__ == "__main__":
         print("OK all vehs arrived ")
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
-    for agent in agent_list:
-        if agent.get_vehID() == "init_ShelterA_1_116":
-            utilities.plot_dot(agent)
+    # for agent in agent_list:
+    #     if agent.get_vehID() == "init_ShelterA_1_116":
+    #         utilities.plot_dot(agent)
