@@ -900,7 +900,7 @@ def is_vehIDs_changed_evaciation(target_vehID:str, vehInfo_list:list):
     except Exception as e:
         return False
 
-def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list, INSIGHT_RANGE:float):
+def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list, INSIGHT_RANGE:int):
     # 反対車線にいる車両のうち、避難地を変更した車両がいるかを判定
     target_vehInfo: VehicleInfo = find_vehInfo_by_vehID(target_vehID, vehInfo_list)
     if target_vehInfo.get_agent_changed_flag():
@@ -922,7 +922,7 @@ def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list, INSIGHT_RANGE:fl
 
             for another_lane_vehIDs in another_lane_vehIDs:
                 if another_lane_vehIDs != target_vehID:
-                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < INSIGHT_RANGE:
+                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < float(INSIGHT_RANGE):
                         return True
 
             return False
