@@ -97,7 +97,7 @@ def control_vehicles(INSIGHT_RANGE: float):
     global POSITIVE_MAJORITY_BIAS_COUNT
     global NEGATIVE_MAJORITY_BIAS_COUNT
     global NORMALCY_BIAS_COUNT
-    global OBTAIN_INFO_LANE_CHANFE_COUNT
+    global OBTAIN_INFO_LANE_CHANGE_COUNT
     global ELAPSED_TIME_LANE_CHANGE_COUNT
     # 現在の存在するrouteを確認する
     for routeID in traci.route.getIDList():
@@ -269,7 +269,7 @@ def control_vehicles(INSIGHT_RANGE: float):
                                                                             )
                         if success_lane_change:
                             LANE_CHANGED_VEHICLE_COUNT += 1
-                            OBTAIN_INFO_LANE_CHANFE_COUNT += 1
+                            OBTAIN_INFO_LANE_CHANGE_COUNT += 1
                             # print("変更2！！！！")
                             agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                     continue

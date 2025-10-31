@@ -55,7 +55,7 @@ VEH_START_TIME_BY_SHELTERID = {"ShelterA_1": 0, "ShelterA_2": 0} # 避難所ご�
 TOTAL_VEHNUM = 150
 NEW_VEHICLE_COUNT = 0
 LANE_CHANGED_VEHICLE_COUNT = 0
-OBTAIN_INFO_LANE_CHANFE_COUNT = 0
+OBTAIN_INFO_LANE_CHANGE_COUNT = 0
 ELAPSED_TIME_LANE_CHANGE_COUNT = 0
 NORMALCY_BIAS_COUNT = 0
 POSITIVE_MAJORITY_BIAS_COUNT = 0
@@ -97,7 +97,7 @@ def control_vehicles(INSIGHT_RANGE: float):
     global POSITIVE_MAJORITY_BIAS_COUNT
     global NEGATIVE_MAJORITY_BIAS_COUNT
     global NORMALCY_BIAS_COUNT
-    global OBTAIN_INFO_LANE_CHANFE_COUNT
+    global OBTAIN_INFO_LANE_CHANGE_COUNT
     global ELAPSED_TIME_LANE_CHANGE_COUNT
     # 現在の存在するrouteを確認する
     for routeID in traci.route.getIDList():
@@ -177,32 +177,32 @@ def control_vehicles(INSIGHT_RANGE: float):
 
         if not vehInfo_by_current_vehID.get_arrival_flag(): # 未到着の車両に対して処理を実行
             # 通信可能範囲内にいる車両と通信を行う　通信可能範囲は100m設定になる
-            if traci.simulation.getTime() % 10 == 0:
-                around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
-                utilities.v2v_communication(
-                                            target_vehID=current_vehID, 
-                                            target_vehInfo=vehInfo_by_current_vehID, 
-                                            around_vehIDs=around_vehIDs,
-                                            agent_list=agent_list,
-                                            vehInfo_list=vehInfo_list,
-                                            COMMUNICATION_RANGE=COMMUNICATION_RANGE
-                                            )
+            # if traci.simulation.getTime() % 10 == 0:
+            #     around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
+            #     utilities.v2v_communication(
+            #                                 target_vehID=current_vehID, 
+            #                                 target_vehInfo=vehInfo_by_current_vehID, 
+            #                                 around_vehIDs=around_vehIDs,
+            #                                 agent_list=agent_list,
+            #                                 vehInfo_list=vehInfo_list,
+            #                                 COMMUNICATION_RANGE=COMMUNICATION_RANGE
+            #                                 )
 
-                utilities.v2shelter_communication(
-                                                    target_vehID=current_vehID, 
-                                                    shelterID=vehInfo_by_current_vehID.get_target_shelter(),
-                                                    vehInfo_list=vehInfo_list,
-                                                    shelter_list=shelter_list,
-                                                    COMMUNICATION_RANGE=COMMUNICATION_RANGE
-                                                    )
+            #     utilities.v2shelter_communication(
+            #                                         target_vehID=current_vehID, 
+            #                                         shelterID=vehInfo_by_current_vehID.get_target_shelter(),
+            #                                         vehInfo_list=vehInfo_list,
+            #                                         shelter_list=shelter_list,
+            #                                         COMMUNICATION_RANGE=COMMUNICATION_RANGE
+            #                                         )
                 
-                utilities.v2v_communication_about_tsunami_info(
-                                                                target_vehID=current_vehID, 
-                                                                target_vehInfo=vehInfo_by_current_vehID, 
-                                                                around_vehIDs=around_vehIDs, 
-                                                                vehInfo_list=vehInfo_list, 
-                                                                COMMUNICATION_RANGE=COMMUNICATION_RANGE
-                                                                )
+            #     utilities.v2v_communication_about_tsunami_info(
+            #                                                     target_vehID=current_vehID, 
+            #                                                     target_vehInfo=vehInfo_by_current_vehID, 
+            #                                                     around_vehIDs=around_vehIDs, 
+            #                                                     vehInfo_list=vehInfo_list, 
+            #                                                     COMMUNICATION_RANGE=COMMUNICATION_RANGE
+            #                                                     )
 
             # 心理モデルの実装
             if current_edgeID in ["E2", "E3", "E4", "E5", "E6", "E7"] and not agent_by_current_vehID.get_evacuation_route_changed_flg():
@@ -269,7 +269,7 @@ def control_vehicles(INSIGHT_RANGE: float):
                                                                             )
                         if success_lane_change:
                             LANE_CHANGED_VEHICLE_COUNT += 1
-                            OBTAIN_INFO_LANE_CHANFE_COUNT += 1
+                            OBTAIN_INFO_LANE_CHANGE_COUNT += 1
                             # print("変更2！！！！")
                             agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                     continue
@@ -559,7 +559,7 @@ if __name__ == "__main__":
     run(INSIGHT_RANGE=INSIGHT_RANGE)
     print("===== Simlation Result Summary =====")
     print("LANE_CHANGED_VEHICLE_NUM:", LANE_CHANGED_VEHICLE_COUNT)
-    print("OBTAIN_INFO_LANE_CHANFE_COUNT:", OBTAIN_INFO_LANE_CHANFE_COUNT)
+    print("OBTAIN_INFO_LANE_CHANGE_COUNT:", OBTAIN_INFO_LANE_CHANGE_COUNT)
     print("ELAPSED_TIME_LANE_CHANGE_COUNT:", ELAPSED_TIME_LANE_CHANGE_COUNT) 
     print("NORMALCY_BIAS_COUNT:", NORMALCY_BIAS_COUNT)
     print("NEGATIVE_MAJORITY_BIAS_COUNT:", NEGATIVE_MAJORITY_BIAS_COUNT)
