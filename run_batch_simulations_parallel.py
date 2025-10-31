@@ -24,7 +24,7 @@ SIM_SCRIPTS = [
 ]
 
 # シミュレーションの固定引数
-STATIC_ARGS = ["--nogui", "5.0", "50"]
+STATIC_ARGS = ["--nogui", "5.0", "20"]
 
 # 結果を保存するJSONファイル名
 OUTPUT_JSON_FILE = "simulation_averages.json"
@@ -38,7 +38,7 @@ vehicle_interval = 5.0
 # 追加集計のキー（stdoutで "KEY: <int>" 形式を想定）
 ADDITIONAL_KEYS = [
     "INSIGHT_RANGE",
-    "OBTAIN_INFO_LANE_CHANFE_COUNT",
+    "OBTAIN_INFO_LANE_CHANGE_COUNT",
     "ELAPSED_TIME_LANE_CHANGE_COUNT",
     "NORMALCY_BIAS_COUNT",
     "NEGATIVE_MAJORITY_BIAS_COUNT",
@@ -175,7 +175,7 @@ def run_simulation_with_nosystem(script_name: str, early_rate: float, log_suffix
             if line.startswith(f"{key}:"):
                 try:
                     val_str = line.split(":", 1)[1].strip()
-                    extra_metrics[key] = int(val_str)
+                    extra_metrics[key] =  _parse_num(val_str)
                 except Exception as e:
                     print(f"Error parsing {key}: {e}")
 
@@ -189,6 +189,12 @@ def run_simulation_with_nosystem(script_name: str, early_rate: float, log_suffix
         print(f"Error writing to log file: {e}")
     return arrival_time_by_target_vehID_dict, changed_vehicle_num, extra_metrics
 
+def _parse_num(s: str):
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
+    
 # 並列実行のユーティリティ
 def _run_once(mode: str, early_rate: float, run_index: int):
     if mode == "system":
