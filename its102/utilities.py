@@ -627,7 +627,7 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             tunning_threshold=random.randint(EARLY_AGENT_THRESHOLD_LIST[0], EARLY_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=max(0, random.gauss(mu=60, sigma=30)),
                             lane_change_init_threshold=random.uniform(800, 1000),
-                            normalcy_motivation_increase=random.uniform(700, 1000),
+                            normalcy_motivation_increase=random.uniform(800, 1000),
                             motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
                             motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
                             lane_minimum_motivation_value=random.uniform(500, 700)
@@ -900,7 +900,7 @@ def is_vehIDs_changed_evaciation(target_vehID:str, vehInfo_list:list):
     except Exception as e:
         return False
 
-def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list):
+def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list, INSIGHT_RANGE:float):
     # 反対車線にいる車両のうち、避難地を変更した車両がいるかを判定
     target_vehInfo: VehicleInfo = find_vehInfo_by_vehID(target_vehID, vehInfo_list)
     if target_vehInfo.get_agent_changed_flag():
@@ -922,7 +922,7 @@ def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list):
 
             for another_lane_vehIDs in another_lane_vehIDs:
                 if another_lane_vehIDs != target_vehID:
-                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < 30:
+                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < INSIGHT_RANGE:
                         return True
 
             return False

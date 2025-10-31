@@ -46,7 +46,6 @@ DEPART_TIME: double = 0.0
 ROUTE_NUM = 0
 SPEED_ARRANGE = 1
 CONGESTION_RATE = 0.3
-INSIGHT_RANGE = 15 
 SHOW_DEBUG_COUNT = 0
 THRESHOLD_SPEED = 2.77 # 10km/h
 STOPPING_TIME_IN_SHELTER = 15
@@ -65,7 +64,7 @@ TSUNAMI_PRECURSOR_INFO_OBTAIN_TIME = 0
 DECISION_EVALUATION_INTERVAL_FOR_INITIAL = 10.0
 DECISION_EVALUATION_INTERVAL = 10.0
 MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS = 100.0
-MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 150.0
+MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 100.0
 
 # リストの初期化
 custome_edge_list: list = []
@@ -83,15 +82,15 @@ elapsed_time_list = []
 # dictの初期化
 current_route_dict = {}
 
-def run(majority_bias_score: float):
+def run(INSIGHT_RANGE: float):
     while traci.simulation.getTime() < END_SIMULATION_TIME:
         traci.simulationStep()
-        control_vehicles(majority_bias_score=majority_bias_score)
+        control_vehicles(INSIGHT_RANGE=INSIGHT_RANGE)
     traci.close()
     sys.stdout.flush()
 
 
-def control_vehicles(majority_bias_score: float):
+def control_vehicles(INSIGHT_RANGE: float):
     vehIDs = traci.vehicle.getIDList()
     global NEW_VEHICLE_COUNT
     global LANE_CHANGED_VEHICLE_COUNT
@@ -282,7 +281,7 @@ def control_vehicles(majority_bias_score: float):
                         and agent_by_current_vehID.get_normalcy_lane_change_motivation_flg()):
                     
                     # 周囲が避難行動を取らない場合、自身も合わせようとするため、閾値が減少
-                    if (not utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list) 
+                    if (not utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list, INSIGHT_RANGE=INSIGHT_RANGE) 
                         and not agent_by_current_vehID.get_lane_minimum_motivation_value_flg()):
                         elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time()
                         # 現在値を更新してから、情報受領分を上乗せ
@@ -336,7 +335,6 @@ def control_vehicles(majority_bias_score: float):
 
                             # この tick の以降処理はスキップ（任意）
                             continue
-
 
                         agent_by_current_vehID.set_calculated_motivation_value(new_motivation)
                         x_list = list(agent_by_current_vehID.get_x_elapsed_time_for_lane_change_list())
@@ -479,8 +477,8 @@ def get_options():
 if __name__ == "__main__":
     early_rate :float= float(sys.argv[2])
     vehicle_interval: float= float(sys.argv[3]) # 車両の生成間隔 7.0がベース
-    majority_bias_score: float = float(sys.argv[4])  # 同調性バイアスの割合
-    print(f"early_rate: {early_rate}, vehicle_interval: {vehicle_interval}, majority_bias_score: {majority_bias_score}")
+    INSIGHT_RANGE: float = float(sys.argv[4])  # 同調性バイアスの割合
+    print(f"early_rate: {early_rate}, vehicle_interval: {vehicle_interval}, INSIGHT_RANGE: {INSIGHT_RANGE}")
     options = get_options()
     if options.nogui:
         sumoBinary = checkBinary('sumo')
@@ -558,8 +556,9 @@ if __name__ == "__main__":
     utilities.init_driver_behavior(vehIDs = vehID_list, lane_change_mode=1)
     for vehID in traci.vehicle.getIDList():
         traci.vehicle.setMaxSpeed(vehID, 9.0)
-    run(majority_bias_score=majority_bias_score)
+    run(INSIGHT_RANGE=INSIGHT_RANGE)
     print("===== Simlation Result Summary =====")
+    print("INSIGHT_RANGE:", INSIGHT_RANGE)
     print("LANE_CHANGED_VEHICLE_NUM:", LANE_CHANGED_VEHICLE_COUNT)
     print("OBTAIN_INFO_LANE_CHANFE_COUNT:", OBTAIN_INFO_LANE_CHANFE_COUNT)
     print("ELAPSED_TIME_LANE_CHANGE_COUNT:", ELAPSED_TIME_LANE_CHANGE_COUNT) 
@@ -573,6 +572,6 @@ if __name__ == "__main__":
         print("OK all vehs arrived ")
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
-    # for agent in agent_list:
-    #     if agent.get_vehID() == "init_ShelterA_1_116":
-    #         utilities.plot_dot(agent)
+    for agent in agent_list:
+        if agent.get_vehID() == "init_ShelterA_1_116":
+            utilities.plot_dot(agent)
