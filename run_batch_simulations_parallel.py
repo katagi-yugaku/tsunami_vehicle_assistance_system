@@ -31,7 +31,7 @@ OUTPUT_JSON_FILE = "simulation_averages.json"
 
 script_name_with_system = "its102.map_one.simulation.runner"
 script_name_with_nosystem = "its102.map_one.simulation.runner_nosystem"
-NUM_RUNS = 50
+NUM_RUNS = 2
 early_rate_list = [0.1, 0.5, 0.9]
 vehicle_interval = 5.0
 
