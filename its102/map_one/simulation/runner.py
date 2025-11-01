@@ -32,12 +32,16 @@ from ...agents.Agent import Agent
 from ...agents.CustomeEdge import CustomeEdge, ConnectedEdges
 from ...agents.Shelter import Shelter
 from ...agents.VehicleInfo import VehicleInfo
+import datetime
 
 # =========================
 # Runtime config / seeds
 # =========================
 # random.seed(318)  # 乱数シードを固定（再現性）
 random.seed()
+random.seed(os.getpid() + int(datetime.datetime.now().timestamp()))
+np.random.seed(os.getpid() + int(datetime.datetime.now().timestamp()))
+
 
 COMMUNICATION_RANGE = 100
 END_SIMULATION_TIME = 2000
