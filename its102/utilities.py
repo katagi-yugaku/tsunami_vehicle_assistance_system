@@ -639,7 +639,7 @@ def init_agent_list(vehIDs:list, edgeID_by_shelterID:dict, EARLY_AGENT_THRESHOLD
                             tunning_threshold=random.randint(LATE_AGENT_THRESHOLD_LIST[0], LATE_AGENT_THRESHOLD_LIST[1]), 
                             route_change_threshold=random.gauss(mu=-60, sigma=20),
                             lane_change_init_threshold=random.uniform(800, 1000),
-                            normalcy_motivation_increase=random.uniform(400, 700),
+                            normalcy_motivation_increase=random.uniform(500, 700),
                             motivation_decrease_due_to_inactive_neighbors=MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS,
                             motivation_increase_due_to_following_neighbors=MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS,
                             lane_minimum_motivation_value=random.uniform(500, 700)

@@ -64,7 +64,7 @@ TSUNAMI_PRECURSOR_INFO_OBTAIN_TIME = 0
 DECISION_EVALUATION_INTERVAL_FOR_INITIAL = 10.0
 DECISION_EVALUATION_INTERVAL = 10.0
 MOTIVATION_DECREASE_FROM_INACTIVE_NEIGHBORS = 100.0
-MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 100.0
+MOTIVATION_INCREASE_FOLLOWING_NEIGHBORS = 150.0
 
 # リストの初期化
 custome_edge_list: list = []
@@ -238,6 +238,7 @@ def control_vehicles(INSIGHT_RANGE: float):
                     agent_by_current_vehID.update_calculated_motivation_value(current_time=elapsed_time)
                     current_motivation = agent_by_current_vehID.get_calculated_motivation_value()
                     inc = float(agent_by_current_vehID.get_motivation_increase_from_info_receive())
+
                     agent_by_current_vehID.set_calculated_motivation_value(current_motivation + inc)
                     agent_by_current_vehID.set_normalcy_lane_change_motivation_flg(True)
                     # ここからが修正ポイント：履歴の「該当 index 以降」に一括加算する
@@ -246,7 +247,7 @@ def control_vehicles(INSIGHT_RANGE: float):
                     # 先に index を決める（elapsed_time より後の先頭インデックス）
                     tail_start_idx = None
                     for idx, t in enumerate(x_list):
-                        if elapsed_time < t:
+                        if elapsed_time <= t:
                             tail_start_idx = idx
                             break
                         
@@ -259,7 +260,6 @@ def control_vehicles(INSIGHT_RANGE: float):
                         # XY 対応表も再構築
                         agent_by_current_vehID.set_lane_change_xy_dict(dict(zip(x_list, y_list)))
                     NORMALCY_BIAS_COUNT += 1
-                    # 閾値判定（※仕様に合わせて < / >= を選択）
                     if agent_by_current_vehID.get_calculated_motivation_value() >= agent_by_current_vehID.get_lane_change_decision_threshold():
                         # print("津波情報取得による避難行動発生")
                         success_lane_change = utilities.lane_change_by_vehID(
