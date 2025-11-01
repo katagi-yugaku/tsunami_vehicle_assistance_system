@@ -410,7 +410,7 @@ def control_vehicles(INSIGHT_RANGE: float):
 
 
             if current_edgeID == "E16":
-                if traci.simulation.getTime() > 180 and traci.simulation.getTime() < 250:
+                if traci.simulation.getTime() > 400 and traci.simulation.getTime() < 450:
                     vehInfo_by_current_vehID.update_tsunami_precursor_info(vehID=current_vehID, tsunami_precursor_flag=True, current_time=traci.simulation.getTime())
                 NEW_VEHICLE_COUNT = utilities.generate_new_veh(
                                                                         target_vehID=current_vehID, 
@@ -476,8 +476,8 @@ def get_options():
 
 if __name__ == "__main__":
     early_rate :float= float(sys.argv[2])
-    vehicle_interval: float= float(sys.argv[3]) # 車両の生成間隔 7.0がベース
-    INSIGHT_RANGE: float = float(sys.argv[4])  # 同調性バイアスの割合
+    vehicle_interval: float= float(sys.argv[3])
+    INSIGHT_RANGE: float = float(sys.argv[4])
     print(f"early_rate: {early_rate}, vehicle_interval: {vehicle_interval}, INSIGHT_RANGE: {INSIGHT_RANGE}")
     options = get_options()
     if options.nogui:
