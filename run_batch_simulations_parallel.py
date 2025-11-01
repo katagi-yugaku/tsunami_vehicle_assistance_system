@@ -24,14 +24,14 @@ SIM_SCRIPTS = [
 ]
 
 # シミュレーションの固定引数
-STATIC_ARGS = ["--nogui", "5.0", "20"]
+STATIC_ARGS = ["--nogui", "5.0", "30"]
 
 # 結果を保存するJSONファイル名
 OUTPUT_JSON_FILE = "simulation_averages.json"
 
 script_name_with_system = "its102.map_one.simulation.runner"
 script_name_with_nosystem = "its102.map_one.simulation.runner_nosystem"
-NUM_RUNS = 2
+NUM_RUNS = 50
 early_rate_list = [0.1, 0.5, 0.9]
 vehicle_interval = 5.0
 
@@ -98,6 +98,8 @@ def run_simulation_with_system(script_name: str, early_rate: float, log_suffix: 
                 print(f"Error parsing vehID dict: {e}")
 
         for key in ADDITIONAL_KEYS:
+            if key == "OBTAIN_INFO_LANE_CHANGE_COUNT":
+                print(line)
             if line.startswith(f"{key}:"):
                 try:
                     val_str = line.split(":", 1)[1].strip()
