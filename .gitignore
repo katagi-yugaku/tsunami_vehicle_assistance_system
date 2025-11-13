@@ -1,0 +1,41 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Simulation outputs
+*.log
+*.pdf
+*.json
+*.xml
+*.trc
+output/
+results/
+traci_log.txt
+
+# SUMO Source Code (Assuming you don't want to track this)
+.appveyor.yml
+.gitattributes
+.github/
+.gitmodules
+.pre-commit-config.yaml
+AUTHORS
+CITATION.cff
+CMakeLists.txt
+CMakeSettings.json
+CONTRIBUTING.md
+ChangeLog
+Jenkinsfile
+LICENSE
+NOTICE.md
+README.md
+bin/
+build_config/
+cmake-variants.yaml
+data/
+docs/
+sonar-project.properties
+src/
+sumo.doxyconf
+tests/
+tools/
+unittest/
